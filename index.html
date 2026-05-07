@@ -308,13 +308,7 @@ function voiceRemapCategoryByType(text,type){
   }
   return"其他";
 }
-function parseVoiceText(text,defaultCurrency){defaultCurrency=defaultCurrency||settings.defaultCurrency||"EUR";var segs=voiceSplitInput(text);return segs.map(function(seg){seg=seg.trim();if(!seg)return null;var curInfo=voiceDetectCurrency(seg,defaultCurrency);var amtInfo=voiceExtractAmount(seg);var type=voiceDetectType(seg);var dateInfo=voiceExtractDate(seg);var desc=voiceCleanDesc(seg);var needAmt=!amtInfo||amtInfo.amount===null||amtInfo.amount<=0;
-  // L_FIX4: 强制按类型重映射类别，确保 AI 输出严格落在新分类组里
-  var mappedCat=voiceRemapCategoryByType(seg,type);
-  // 双保险：如果不在该类型的允许列表里，归到"其他"
-  var allowed=(typeof DEFAULT_CATS_BY_TYPE!=="undefined"&&DEFAULT_CATS_BY_TYPE[type])?DEFAULT_CATS_BY_TYPE[type].map(function(c){return c.name;}):null;
-  if(allowed&&allowed.indexOf(mappedCat)===-1)mappedCat="其他";
-  return{ok:!needAmt,needAmountInput:needAmt,needCurrencyConfirm:curInfo.needConfirm,amount:needAmt?null:amtInfo.amount,currency:curInfo.currency,category:mappedCat,type:type,desc:desc,ts:dateInfo.ts,timeLabel:dateInfo.label,timePrecision:dateInfo.label?"day":"exact",yearOnly:null};}).filter(function(r){return r!==null})}
+/* ── parseVoiceText 已迁移至 src/domain/voice/parser.js（模块版 window.acct.parseVoiceText）── */
 
 // ── SFX ──
 var SFX={enabled:localStorage.getItem("sfxEnabled")!=="false",volume:parseFloat(localStorage.getItem("sfxVolume")||"0.7"),ctx:null,_last:{},init:function(){if(!this.ctx){try{this.ctx=new(window.AudioContext||window.webkitAudioContext)()}catch(e){this.ctx=null}}},_tone:function(freq,dur,vol,opts){if(!this.ctx)return;var t=this.ctx.currentTime;var o=this.ctx.createOscillator();var g=this.ctx.createGain();o.type=(opts&&opts.type)||"sine";o.frequency.setValueAtTime(freq,t);if(opts&&opts.glide){o.frequency.exponentialRampToValueAtTime(opts.glide,t+dur/1000)}var v=(vol!==undefined?vol:1)*this.volume;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+0.005);g.gain.exponentialRampToValueAtTime(0.0001,t+dur/1000);o.connect(g);g.connect(this.ctx.destination);o.start(t);o.stop(t+dur/1000+0.02)},play:function(type){if(!this.enabled)return;var now=Date.now();if(this._last[type]&&now-this._last[type]<50)return;this._last[type]=now;this.init();if(!this.ctx)return;if(this.ctx.state==="suspended"){try{this.ctx.resume()}catch(e){}}switch(type){case"tap":this._tone(800,30,0.45);break;case"tap-alt":this._tone(600,40,0.50);break;case"success":this._tone(880,90,0.55);var s=this;setTimeout(function(){s._tone(1200,120,0.55)},80);break;case"tab":this._tone(1000,25,0.30);break;case"open":this._tone(400,80,0.50,{glide:700});break;case"close":this._tone(700,80,0.50,{glide:400});break;case"delete":this._tone(200,60,0.65);break;case"error":this._tone(300,55,0.55);var s2=this;setTimeout(function(){s2._tone(300,55,0.55)},80);break;default:this._tone(800,30,0.4)}}};
@@ -775,11 +769,7 @@ function _iaUpdateDateBtn(){var lbl=document.getElementById("iaDateLbl");if(!lbl
 function doEdit(){var idx=detailIdx;closeOv("ov-detail");openManual(idx)}
 function doDelete(){if(detailIdx<0)return;var idx=detailIdx;closeOv("ov-detail");fxOpen();setTimeout(function(){confirmDelete(idx)},120)}
 
-function openInputSheet(){fxOpen();document.getElementById("ov-input").style.display="flex";setTimeout(function(){document.getElementById("field").focus()},120)}
-var _pendingNeedAmt=null,_pendingAfterCur=null;
-function doSend(){var text=document.getElementById("field").value.trim();if(!text)return;document.getElementById("field").value="";var results=parseVoiceText(text,settings.defaultCurrency||"EUR");var valid=results.filter(function(r){return r.ok});var needAmt=results.filter(function(r){return r.needAmountInput});var needCur=results.filter(function(r){return r.needCurrencyConfirm});if(needCur.length){_pendingAfterCur={valid:valid,needAmt:needAmt};var desc=needCur.map(function(r){return r.desc}).join("、");document.getElementById("cur-modal-sub").textContent="「"+desc.slice(0,20)+"」同时含两种货币，请选择";document.getElementById("cur-modal").style.display="flex";return}_doSendFinish(valid,needAmt)}
-function chooseCurrency(cur){document.getElementById("cur-modal").style.display="none";if(_pendingAfterCur){var v=_pendingAfterCur.valid,n=_pendingAfterCur.needAmt;v.concat(n).forEach(function(r){if(r.needCurrencyConfirm)r.currency=cur});_pendingAfterCur=null;_doSendFinish(v,n)}}
-function _doSendFinish(valid,needAmt){if(!valid.length&&needAmt.length){_pendingNeedAmt=needAmt[0];showAmtPrompt(needAmt[0]);return}if(!valid.length){showErr("没能识别金额，请说明花了多少钱");return}pending=valid;confirmYearOnly=false;confirmYear=0;confirmMonthSel=-1;document.getElementById("ov-input").style.display="none";showConfirm()}
+/* ── 输入流 doSend / openInputSheet / chooseCurrency / clearInputField 已迁移至 src/ui/modals/input.js ── */
 /* ── 确认弹窗已迁移至 src/ui/modals/confirm.js ── */
 
 /* ── 分析页已迁移至 src/ui/tabs/analysis.js ── */
@@ -801,8 +791,7 @@ function toggleDisplayCurrency(){fxTap();settings.displayCurrency=settings.displ
 // F24: Web Speech API 语音输入
 // L_FIX3: 持续识别模式 — 只有再次点麦克风按钮才停止
 var _speechRec=null,_speechActive=false,_speechUserStop=false,_speechFinalText="";
-// L2: 清空记一笔输入并关闭
-function clearInputField(alsoClose){var f=document.getElementById("field");if(f)f.value="";fxClose();if(alsoClose)closeOv("ov-input");}
+// L2: 清空记一笔输入并关闭 —— clearInputField 已迁移至 src/ui/modals/input.js
 function toggleVoice(){
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){fxError();showToast("当前浏览器不支持语音识别");return;}

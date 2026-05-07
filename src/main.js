@@ -318,6 +318,15 @@ window.hexToHsl          = settingsTab.hexToHsl;
 window.hslToHex          = settingsTab.hslToHex;
 window.contrastText      = settingsTab.contrastText;
 
+// ── 桥接输入流（doSend / openInputSheet / chooseCurrency / clearInputField）──
+//
+// HTML 中 onclick="doSend()" / onclick="openInputSheet()" / onclick="chooseCurrency('CNY')"
+// / onclick="clearInputField(true)" 全部路由到模块版。
+window.doSend          = inputModal.doSend;
+window.openInputSheet  = inputModal.open;
+window.clearInputField = inputModal.clearInputField;
+window.chooseCurrency  = currencyConfirmModal.choose;
+
 // ── 桥接 renderAiSug ────────────────────────────────────────────────────────
 window.renderAiSug = inputModal.renderAiSug;
 window.hideAiSug   = inputModal.hideAiSug;

@@ -1,24 +1,19 @@
 // ui/modals/input.js —— 一句话记账输入弹窗（#ov-input）
 //
 // 职责：
-//   - 打开输入弹窗，预填推荐词
-//   - 用户输入后 → 调 parseVoiceText → 分流到货币确认 / 补录金额 / 确认弹窗
-//   - 提供"手动记账"按钮跳转到 manual modal
+//   - 打开/关闭输入弹窗（openInputSheet / clearInputField）
+//   - doSend：用户输入 → parseVoiceText → 货币确认 / 补录金额 / 确认弹窗分流
+//   - renderAiSug / hideAiSug：推荐词渲染（高频描述 + 可删除）
 //
 // 协作：
 //   - parseVoiceText 来自 domain/voice/parser.js
 //   - 货币冲突 → currency-confirm modal
-//   - 金额缺失 → 弹补录输入框（也定义在本文件）
-//   - 解析成功 → confirm modal
-//
-// TODO（细节待迁入）：
-//   - renderAiSug() 推荐词渲染（高频描述 + 可删除）
-//   - showAmtPrompt(result) 无金额时的补录小弹窗
-//   - 一句话与手动记账切换的过渡动画
+//   - 金额缺失 → confirm modal showAmtPrompt
+//   - 解析成功 → confirm modal open
 
 import { byId, on, qsa } from "../../utils/dom.js";
 import { openOverlay, closeOverlay, attachSheetSwipe } from "../components/overlay.js";
-import { fxTap } from "../components/sfx.js";
+import { fxTap, fxOpen, fxClose } from "../components/sfx.js";
 import { parseVoiceText } from "../../domain/voice/parser.js";
 import { store } from "../../state/store.js";
 import { DEFAULT_CATS_BY_TYPE } from "../../domain/categories.js";
@@ -43,20 +38,14 @@ export function init(deps) {
   _manualModal   = deps.manualModal;
 
   attachSheetSwipe(SHEET_ID, HANDLE_ID, close);
-
-  const sendBtn = byId("sendBtn");
-  if (sendBtn) on(sendBtn, "click", doSend);
-
-  const field = byId("inputField");
-  if (field) on(field, "keydown", (e) => {
-    if (e.key === "Enter") doSend();
-  });
+  // 点击/键盘事件由 HTML onclick="doSend()" 桥接到 window.doSend（→ 本模块 doSend），
+  // 不再 addEventListener，避免与 inline 的 onclick 双重触发。
 }
 
 export function open() {
-  // TODO: renderAiSug() 推荐词
+  fxOpen();
   openOverlay(OVERLAY_ID);
-  setTimeout(() => byId("inputField")?.focus(), 80);
+  setTimeout(() => byId("field")?.focus(), 120);
 }
 
 export function close() {
@@ -65,12 +54,22 @@ export function close() {
   if (sugRow) { sugRow.style.display = "none"; sugRow.innerHTML = ""; }
 }
 
-/** 一句话发送：解析 → 分流到货币 / 补录 / 确认。 */
+/** 清空输入框并可选关闭弹窗（inline clearInputField 桥接到此）。 */
+export function clearInputField(alsoClose) {
+  const f = byId("field");
+  if (f) f.value = "";
+  fxClose();
+  if (alsoClose) close();
+}
+
+/** 一句话发送：解析 → 分流到货币 / 补录 / 确认。与 inline doSend 行为完全等价。 */
 export function doSend() {
   fxTap();
-  const field = byId("inputField");
+  const field = byId("field");
   const text = (field?.value || "").trim();
   if (!text) return;
+  // 立即清空输入框（与 inline 一致：无论解析成功与否都先清）
+  field.value = "";
 
   const settings = store.getSettings();
   const results = parseVoiceText(text, {
@@ -78,14 +77,18 @@ export function doSend() {
     allowedCategoriesByType: DEFAULT_CATS_BY_TYPE,
   });
 
-  if (!results.length) return;
+  if (!results || !results.length) return;
 
-  // 货币冲突：让用户选完再继续
-  const needCurrency = results.some((r) => r.needCurrencyConfirm);
-  if (needCurrency) {
+  const valid      = results.filter((r) => r.ok);
+  const needAmt    = results.filter((r) => r.needAmountInput);
+  const needCur    = results.filter((r) => r.needCurrencyConfirm);
+
+  // 货币冲突：弹出 #cur-modal 让用户选择
+  if (needCur.length) {
     _currencyModal?.open(results, (chosen) => {
-      const fixed = results.map((r) => ({ ...r, currency: chosen, needCurrencyConfirm: false }));
-      _afterParse(fixed);
+      // 把选定币种应用到所有需要确认的 result
+      results.forEach((r) => { if (r.needCurrencyConfirm) r.currency = chosen; });
+      _afterParse(results);
     });
     return;
   }
@@ -104,9 +107,6 @@ function _afterParse(results) {
     _confirmModal?.showErr("没能识别金额，请说明花了多少钱");
     return;
   }
-
-  const field = byId("inputField");
-  if (field) field.value = "";
 
   const ovInput = byId("ov-input");
   if (ovInput) ovInput.style.display = "none";
