@@ -3,7 +3,8 @@
 // 模块化进度：
 //   ✅ renderHero —— Hero 顶部区
 //   ✅ renderList —— 交易列表（按日分组 + 左滑删除 + 内联编辑入口）
-//   ⚠️ 月份切换、内联编辑回调函数本身仍由 inline 实现，本模块通过 window.* 反向调用
+//   ✅ inlineEditDesc —— 列表行就地编辑描述
+//   ⚠️ inlineEditAmt（金额计算器弹窗 + #ov-iamt）、WheelTime 仍由 inline 实现
 //
 // 视图状态（_viewYear/_viewMonth）属于本 tab 私有，不进 store。
 // inline 的 changeMonth() 会调 render() → 经 window.renderList 桥接进入 mainTab.renderList，
@@ -292,6 +293,96 @@ function timeBlockHtml(tx, idx) {
   const safe = txt ? escapeHtml(txt) : "";
   return `<div class="tim"${hide} data-idx="${idx}" onclick="event.stopPropagation();openWheelTimeForTx(${idx})">` +
          `<span class="tim-date" data-role="time">${safe}</span></div>`;
+}
+
+// ── 内联编辑：描述 ───────────────────────────────────────────────────────────
+
+/**
+ * 列表行就地编辑描述。与原 inline inlineEditDesc 行为完全等价。
+ * 依赖 window.getTopDescs（inline 未迁移）、window.saveTxs、window.render（均已桥接）。
+ */
+export function inlineEditDesc(idx, rowEl) {
+  const txs = store.getTxs();
+  const t = txs[idx];
+  if (!t) return;
+  const tidEl = rowEl.querySelector(".tid");
+  if (!tidEl || tidEl._editing) return;
+  tidEl._editing = true;
+
+  if (typeof window.fxOpen === "function") window.fxOpen();
+  tidEl.classList.add("editing-hl");
+
+  const origText = t.desc;
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.value = origText;
+  inp.style.cssText =
+    "background:transparent;border:0;outline:none;color:var(--t1);font-size:16px;" +
+    "width:100%;font-family:inherit;padding:0;transform:scale(0.8125);" +
+    "transform-origin:left center;line-height:1";
+  tidEl.innerHTML = "";
+  tidEl.appendChild(inp);
+
+  // 建议条
+  const sugBar = document.createElement("div");
+  sugBar.className = "inline-sug-bar";
+  sugBar.style.cssText =
+    "position:absolute;left:0;right:0;bottom:100%;background:var(--card);" +
+    "border:1px solid var(--bdr);border-radius:8px;padding:6px;display:flex;" +
+    "gap:6px;flex-wrap:wrap;max-width:90vw;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.15);" +
+    "margin-bottom:4px";
+
+  function refreshSug() {
+    sugBar.innerHTML = "";
+    const top = (typeof window.getTopDescs === "function"
+      ? window.getTopDescs(8, origText)
+      : []).filter((d) => !inp.value || d.toLowerCase().indexOf(inp.value.toLowerCase()) >= 0);
+    if (!top.length) { sugBar.style.display = "none"; return; }
+    sugBar.style.display = "flex";
+    top.forEach((d) => {
+      const ch = document.createElement("span");
+      ch.textContent = d;
+      ch.style.cssText =
+        "background:var(--bdr2);color:var(--t1);font-size:11px;padding:4px 8px;" +
+        "border-radius:10px;cursor:pointer";
+      ch.onmousedown = (e) => { e.preventDefault(); inp.value = d; refreshSug(); };
+      ch.ontouchend  = (e) => { e.preventDefault(); inp.value = d; refreshSug(); };
+      sugBar.appendChild(ch);
+    });
+  }
+
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "position:relative";
+  tidEl.parentNode.insertBefore(wrap, tidEl);
+  wrap.appendChild(sugBar);
+  wrap.appendChild(tidEl);
+  refreshSug();
+  inp.oninput = refreshSug;
+  inp.focus();
+  inp.select();
+
+  function commit(save) {
+    if (save) {
+      const v = inp.value.trim();
+      if (v && v !== origText) {
+        t.desc = v;
+        if (typeof window.saveTxs === "function") window.saveTxs(txs);
+      }
+    }
+    tidEl._editing = false;
+    tidEl.classList.remove("editing-hl");
+    if (wrap.parentNode) {
+      wrap.parentNode.insertBefore(tidEl, wrap);
+      wrap.remove();
+    }
+    if (typeof window.render === "function") window.render();
+  }
+
+  inp.addEventListener("blur", () => setTimeout(() => commit(true), 150));
+  inp.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); inp.blur(); }
+    else if (e.key === "Escape") { commit(false); }
+  });
 }
 
 // ── 容错的 textContent 写入 ─────────────────────────────────────────────────
