@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<!-- BATCH_C_MARKER_v1 -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="账本">
+<meta name="theme-color" content="#F5F5F5">
+<title>Sunnn · 我的账本</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Nunito:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="styles/base.css">
+<link rel="stylesheet" href="styles/themes.css">
+<link rel="stylesheet" href="styles/components.css">
+<!-- L_FIX5: Supabase JS SDK（用于账号登录 + 多端同步）。失败也不会影响 PWA 离线使用 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- 渐进迁移期：模块入口。defer 默认，会在下方 inline <script> 之后执行。
+     当前只接管 Hero 渲染（见 src/ui/tabs/main.js）；其余 UI 仍由 inline 主导。
+     完整说明见 src/ARCHITECTURE.md "渐进迁移操作手册"。 -->
+<script type="module" src="src/main.js"></script>
+</head>
+<body class="theme-white">
+<div class="app">
+
+<div class="tab" id="t-main">
+    <div class="hero">
+        <div class="hero-topbar">
+            <!-- L_FIX5: 左上角放账号登录入口（原储蓄按钮挪到右栏货币按钮下方） -->
+            <div class="account-toggle-wrap">
+                <button class="account-toggle" onclick="openAuthSheet()" id="accountToggleBtn" aria-label="账号">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span class="account-toggle-lbl" id="account-toggle-lbl">未登录</span>
+                </button>
+            </div>
+            <div id="user-name-wrap"><span class="user-name" id="user-name-disp" onclick="startEditUserName()">Sunnn</span></div>
+            <div class="hero-right-stack">
+                <button class="search-icon-btn" onclick="openSearchSheet()" aria-label="搜索"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></button>
+                <button class="cur-toggle-btn" onclick="toggleDisplayCurrency()" aria-label="切换显示货币" id="curToggleBtn">€</button>
+                <!-- L_FIX5: 储蓄按钮移到货币按钮下方 -->
+                <div class="savings-toggle-wrap">
+                    <button class="savings-toggle" onclick="toggleSavingsPanel()">
+                        <span class="savings-toggle-lbl">储蓄</span>
+                        <span class="savings-toggle-arrow" id="savings-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+                    </button>
+                    <div class="savings-panel" id="savings-panel">
+                        <div class="savings-panel-amt" id="savings-panel-amt">0.00 €</div>
+                        <div class="savings-panel-lbl">本月累计储蓄</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div style="display:none">
+            <div class="hl">本月净额</div><div class="hn" id="hnet">0.00 €</div><div class="hm" id="hperiod"></div>
+            <div class="stats"><div class="stat"><div class="sl">收入</div><div class="sv" id="sin">0.00 €</div></div><div class="stat"><div class="sl">支出</div><div class="sv" id="sout">0.00 €</div></div><div class="stat"><div class="sl">储蓄</div><div class="sv" id="ssave">0.00 €</div></div></div>
+        </div>
+        <div class="hero-data">
+            <div class="hero-col left"><div class="hero-col-year" id="a2-year">2026年</div><div class="hero-col-month" onclick="openPicker()"><span id="a2-month">04</span><span class="hero-month-suffix">月<span class="hero-month-suffix-caret"><svg width="7" height="4" viewBox="0 0 10 6" fill="currentColor"><path d="M5 6 0 0h10L5 6z"/></svg></span></span></div></div>
+            <div class="hero-divider"></div>
+            <div class="hero-col center"><div class="hero-col-lbl">收入</div><div class="hero-col-num"><span class="hero-num-int" id="a2-income-int">0</span><span class="hero-num-dec" id="a2-income-dec">.00</span></div></div>
+            <div class="hero-col right"><div class="hero-col-lbl">支出</div><div class="hero-col-num"><span class="hero-num-int" id="a2-expense-int">0</span><span class="hero-num-dec" id="a2-expense-dec">.00</span></div></div>
+        </div>
+    </div>
+    <div class="mnav" style="display:none">
+        <div class="mnav-btn" onclick="changeMonth(-1)" aria-label="上月"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></div>
+        <div class="mnav-title" id="navTitle" onclick="openPicker()">▾</div>
+        <div class="mnav-btn" onclick="changeMonth(1)" aria-label="下月"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></div>
+    </div>
+    <div class="list" id="list"></div>
+    <div class="bar" style="display:none"></div>
+</div>
+
+<div class="tab" id="t-analysis" style="display:none"><div class="page-hdr"><h2>分析</h2><p id="an-period" onclick="openPicker()"></p></div><div class="page-scroll" id="analysis-body"></div></div>
+<div class="tab" id="t-search" style="display:none"><div class="search-bar"><input class="search-input" id="searchInput" placeholder="搜索描述、类别、金额…" type="text" oninput="doSearch()"></div><div class="search-results" id="searchResults"><div class="search-empty">输入关键词开始搜索</div></div></div>
+<div class="tab" id="t-settings" style="display:none"><div class="page-hdr"><h2>设置</h2></div><div class="settings-scroll" id="settings-body"></div></div>
+<div class="tab" id="page-goals" style="display:none"><div class="page-hdr"><h2>目标</h2></div><div class="list" id="goals-body"><div class="list-section"><div id="goals-budget-section"></div><div id="goals-savings-section"></div></div></div></div>
+
+<div class="bnav">
+    <div class="bni active" data-t="main"><div class="bni-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg></div><div class="bni-lbl">明细</div></div>
+    <div class="bni" data-t="analysis"><div class="bni-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg></div><div class="bni-lbl">图表</div></div>
+    <div class="bni bnav-plus" onclick="openInputSheet()" aria-label="记一笔"></div>
+    <div class="bni" data-t="goals"><div class="bni-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div><div class="bni-lbl">目标</div></div>
+    <div class="bni" data-t="settings"><div class="bni-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></div><div class="bni-lbl">设置</div></div>
+</div>
+</div>
+
+<div class="overlay" id="ov-search" onclick="if(event.target===this)closeOv('ov-search')"><div class="sheet-wrap"><div class="sheet" id="sh-search"><div class="hdl" id="hdl-search"></div><div class="slbl">搜索</div><input class="search-input" id="searchSheetInput" placeholder="搜索描述、类别、金额…" type="text" oninput="doSearchSheet()" style="margin-bottom:10px"><div id="searchSheetResults" style="max-height:55vh;overflow-y:auto"></div></div></div></div>
+<!-- L_FIX5: 账号 / 多端同步弹窗 -->
+<div class="overlay" id="ov-auth" onclick="if(event.target===this)closeOv('ov-auth')">
+  <div class="sheet-wrap"><div class="sheet" id="sh-auth" style="padding:20px 18px 18px">
+    <div class="hdl-invisible"></div>
+    <div class="detail-hdr"><div class="slbl" style="flex:1;text-align:center;margin-left:36px" id="auth-title">登录账号</div><div class="detail-x" onclick="closeOv('ov-auth')" aria-label="关闭">✕</div></div>
+    <!-- L_FIX6: 未登录态（登录 / 注册） -->
+    <div id="auth-signed-out">
+      <div style="font-size:11px;color:var(--t3);text-align:center;margin-bottom:12px;line-height:1.6">登录后账本会自动同步到云端，<br>多端共享同一份数据。</div>
+      <!-- Google 登录按钮（如果 OAuth 没配置，点击会提示） -->
+      <button class="cbtn" id="btn-google-signin" onclick="doSignInWithGoogle()" style="margin:0 0 10px;background:#fff;color:#333;border:1px solid var(--bdr);display:flex;align-items:center;justify-content:center;gap:8px">
+        <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8a12 12 0 0 1 0-24c3.1 0 5.9 1.2 8 3.1l5.7-5.7A20 20 0 1 0 24 44c11 0 20-8.9 20-20 0-1.3-.1-2.7-.4-3.9z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8A12 12 0 0 1 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7A20 20 0 0 0 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2a12 12 0 0 1-19-5.5l-6.5 5A20 20 0 0 0 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3a12 12 0 0 1-4.1 5.6l6.2 5.2C42 36 44 30.5 44 24c0-1.3-.1-2.7-.4-3.9z"/></svg>
+        <span>用 Google 账号登录</span>
+      </button>
+      <div style="text-align:center;font-size:10px;color:var(--t3);margin:6px 0 10px">或用邮箱</div>
+      <div class="auth-row"><label class="auth-lbl">邮箱</label><input id="auth-email" type="email" class="auth-inp" placeholder="you@example.com" autocomplete="email"></div>
+      <div class="auth-row"><label class="auth-lbl">密码</label><input id="auth-password" type="password" class="auth-inp" placeholder="至少 6 位" autocomplete="current-password"></div>
+      <div id="auth-err" class="auth-err" style="display:none"></div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="cbtn bok" style="flex:1;margin:0" onclick="doSignIn()" id="btn-signin">登录</button>
+        <button class="cbtn bno" style="flex:1;margin:0" onclick="doSignUp()" id="btn-signup">注册</button>
+      </div>
+      <div style="text-align:center;margin-top:10px"><a href="#" onclick="event.preventDefault();showForgotPasswordPrompt()" style="font-size:11px;color:var(--acc);text-decoration:none">忘记密码？</a></div>
+      <!-- 隐私 / 数据声明 -->
+      <div style="text-align:center;font-size:10px;color:var(--t3);margin-top:14px;line-height:1.7;padding:10px 8px;border-top:1px solid var(--bdr)">
+        <strong style="color:var(--t2)">关于你的数据</strong><br>
+        账本数据存储在 Supabase 云数据库（基于 AWS），<br>
+        每个用户只能访问自己的数据（行级权限隔离）。<br>
+        密码用 bcrypt 单向哈希，开发者也看不到。<br>
+        本地离线缓存让你即使断网也能记账。
+      </div>
+    </div>
+    <!-- L_FIX6: 重置密码态（在 app 内显示） -->
+    <div id="auth-reset" style="display:none">
+      <div style="font-size:11px;color:var(--t3);text-align:center;margin-bottom:14px;line-height:1.6">已通过邮件链接验证身份，<br>请设置新密码。</div>
+      <div class="auth-row"><label class="auth-lbl">新密码</label><input id="auth-new-password" type="password" class="auth-inp" placeholder="至少 6 位" autocomplete="new-password"></div>
+      <div class="auth-row"><label class="auth-lbl">确认新密码</label><input id="auth-new-password2" type="password" class="auth-inp" placeholder="再输入一次" autocomplete="new-password"></div>
+      <div id="auth-err-reset" class="auth-err" style="display:none"></div>
+      <button class="cbtn bok" onclick="doUpdatePassword()" id="btn-update-pw" style="margin:14px 0 0">更新密码</button>
+    </div>
+    <!-- L_FIX5: 已登录态 -->
+    <div id="auth-signed-in" style="display:none">
+      <div style="text-align:center;margin-bottom:14px">
+        <div style="font-size:11px;color:var(--t3);letter-spacing:0.4px">当前账号</div>
+        <div id="auth-current-email" style="font-size:15px;font-weight:600;color:var(--t1);margin-top:4px;word-break:break-all"></div>
+        <div id="auth-sync-status" style="font-size:10px;color:var(--t3);margin-top:6px">同步状态：未知</div>
+      </div>
+      <button class="cbtn bok" onclick="doManualSync()" style="margin:0 0 8px">立即同步</button>
+      <button class="cbtn bno" onclick="doSignOut()">退出登录</button>
+    </div>
+  </div></div>
+</div>
+<div class="mpicker" id="mpicker" onclick="if(event.target===this)this.style.display='none'"><div class="mpicker-box"><div class="mpicker-head"><div class="mpicker-yb" id="pyL" onclick="pickerNav(-1)">‹</div><div class="mpicker-ylbl" id="pyLbl" onclick="toggleYM()"></div><div class="mpicker-yb" id="pyR" onclick="pickerNav(1)">›</div></div><div id="pickerBody"></div></div></div>
+
+<div class="overlay" id="ov-input" onclick="if(event.target===this)closeOv('ov-input')"><div class="sheet-wrap"><div class="sheet" id="sh-input" style="padding:6px 16px 8px"><div style="display:flex;justify-content:flex-end;margin-bottom:2px"><div class="input-x" onclick="clearInputField(true)" aria-label="清空并关闭">✕</div></div><div class="sug-row" id="aiSugRow" style="display:none;margin-bottom:8px"></div><div class="bar-row" style="margin-bottom:10px"><div class="bwrap"><input class="field" id="field" placeholder="说一句话记账…" type="text" autocomplete="off" onfocus="renderAiSug()" onclick="renderAiSug()" oninput="renderAiSug()"></div><div class="mic-btn" id="micBtn" onclick="toggleVoice()" aria-label="语音输入"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></div><div class="sbtn" onclick="doSend()"><svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></div></div><div style="display:flex;justify-content:center"><div class="manual-fab" onclick="closeOv('ov-input');openManual(-1)" aria-label="手动记账"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div></div></div></div></div>
+
+<div class="cur-modal" id="cur-modal" style="display:none"><div class="cur-modal-box"><div class="cur-modal-title">检测到两种货币</div><div class="cur-modal-sub" id="cur-modal-sub">请选择本笔交易使用的货币</div><div class="cur-modal-btns"><button class="cur-modal-btn" onclick="chooseCurrency('CNY')">人民币 ¥</button><button class="cur-modal-btn" onclick="chooseCurrency('EUR')">欧元 €</button></div></div></div>
+
+<div class="overlay" id="ov-confirm" onclick="if(event.target===this)closeOv('ov-confirm')"><div class="sheet-wrap"><div class="sheet" id="sh-confirm"><div class="hdl-invisible" id="hdl-confirm"></div><div class="slbl" id="slbl">识别结果</div><div id="sbody"></div><div class="cbtn bok" id="okbtn" onclick="doConfirm()">确认记账</div><div class="cbtn bno" onclick="closeOv('ov-confirm')">取消</div></div></div></div>
+
+<div class="overlay" id="ov-manual" onclick="if(event.target===this)swipeCloseManual()"><div class="sheet-wrap"><div class="sheet" id="sh-manual" style="padding:0 16px"><div class="hdl-invisible" id="hdl-manual" style="height:6px"></div>
+    <div class="manual-type-bar"><div class="manual-type-tabs" id="manualTypeTabs"><div class="manual-type-tab active" data-v="expense" onclick="selTypeTab(this)">支出</div><div class="manual-type-tab" data-v="income" onclick="selTypeTab(this)">收入</div><div class="manual-type-tab" data-v="savings" onclick="selTypeTab(this)">储蓄</div></div><div class="manual-type-cancel" onclick="clearAndCloseManual()" aria-label="清空并关闭">✕</div></div>
+    <div class="manual-cat-row" id="manualCatRow"></div>
+    <div class="manual-cur-row" id="manualCurRow"><div class="manual-cur-pill active" data-v="EUR" onclick="selCurPill(this)">欧元 €</div><div class="manual-cur-pill" data-v="CNY" onclick="selCurPill(this)">人民币 ¥</div></div>
+    <div class="manual-combo"><div class="mc-desc"><span class="mc-desc-lbl">备注：</span><input class="mc-desc-inp" id="mcDescInp" type="text" placeholder="点击填写备注" autocomplete="off" oninput="showManualSug()" onfocus="showManualSug()"></div><div id="mcSugRow" style="display:flex;gap:5px;flex-wrap:wrap;padding:0 14px 6px"></div><div class="mc-sep"></div><div class="mc-amt"><span class="mc-amt-expr" id="mcAmtExpr"></span><span class="mc-amt-val" id="mcAmtVal">0</span><span class="mc-amt-sym" id="mcAmtSym">€</span></div><div class="mc-sep"></div><div class="mc-calc"><div class="mcb" onclick="mcInput('7')">7</div><div class="mcb" onclick="mcInput('8')">8</div><div class="mcb" onclick="mcInput('9')">9</div><div class="mcb mcb-date" id="mcDateBtn"><span class="mdb-emo" style="pointer-events:none">📅</span><span id="mcDateLbl" style="pointer-events:none">今天</span><input type="date" id="mcDateInp" onchange="mcDateChange(this.value)" onclick="tryShowDatePicker(this,event)"></div><div class="mcb" onclick="mcInput('4')">4</div><div class="mcb" onclick="mcInput('5')">5</div><div class="mcb" onclick="mcInput('6')">6</div><div class="mcb mcb-op" onclick="mcInput('+')">+</div><div class="mcb" onclick="mcInput('1')">1</div><div class="mcb" onclick="mcInput('2')">2</div><div class="mcb" onclick="mcInput('3')">3</div><div class="mcb mcb-op" onclick="mcInput('-')">−</div><div class="mcb" onclick="mcInput('.')">.</div><div class="mcb" onclick="mcInput('0')">0</div><div class="mcb mcb-del" onclick="mcInput('B')">⌫</div><div class="mcb mcb-ok" onclick="mcDone()">完成</div></div></div>
+    <div class="slbl" id="manual-title" style="display:none">手动记账</div>
+    <div class="form-row" style="display:none"><div class="form-label">类型</div><div class="seg-btns" id="typebtns"><div class="seg-btn sel" data-v="expense" onclick="selType(this)">支出</div><div class="seg-btn" data-v="income" onclick="selType(this)">收入</div><div class="seg-btn" data-v="savings" onclick="selType(this)">储蓄</div></div></div>
+    <div class="form-row" style="display:none"><div class="form-label">描述（可选）</div><input class="form-input" id="mdesc" type="text" placeholder="例：午饭、打车…" autocomplete="off"><div id="manualSugRow" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px"></div></div>
+    <div class="form-row" style="display:none"><div class="form-label">金额</div><div class="amt-block"><div class="amt-top"><input class="amt-inp" id="mamt" type="number" placeholder="0.00" step="0.01" min="0" oninput="syncCalc()"><div class="amt-sym" id="amtSym">€</div></div><div class="calc-expr" id="calcExpr"></div><div class="calc-mini"><div class="cg"><div class="cm cm-c" onclick="cp('C')">C</div><div class="cm cm-b" onclick="cp('⌫')">⌫</div><div class="cm cm-o" onclick="cp('÷')">÷</div><div class="cm cm-o" onclick="cp('×')">×</div><div class="cm cm-n" onclick="cp('7')">7</div><div class="cm cm-n" onclick="cp('8')">8</div><div class="cm cm-n" onclick="cp('9')">9</div><div class="cm cm-o" onclick="cp('-')">−</div><div class="cm cm-n" onclick="cp('4')">4</div><div class="cm cm-n" onclick="cp('5')">5</div><div class="cm cm-n" onclick="cp('6')">6</div><div class="cm cm-o" onclick="cp('+')">+</div><div class="cm cm-n" onclick="cp('1')">1</div><div class="cm cm-n" onclick="cp('2')">2</div><div class="cm cm-n" onclick="cp('3')">3</div><div class="cm cm-e" onclick="cp('=')" style="grid-row:span 2">=</div><div class="cm cm-n" onclick="cp('0')" style="grid-column:span 2">0</div><div class="cm cm-n" onclick="cp('.')">.</div></div></div></div></div>
+    <div class="form-row" style="display:none"><div class="form-label">日期</div><input class="form-input" id="mdate" type="date"></div>
+    <div class="form-row" style="display:none"><div class="form-label">货币</div><div class="seg-btns" id="curbtns"><div class="seg-btn sel" data-v="EUR" onclick="selCur(this)">欧元 €</div><div class="seg-btn" data-v="CNY" onclick="selCur(this)">人民币 ¥</div></div></div>
+    <div class="form-row" style="display:none"><div class="form-label">类别</div><div class="cat-grid" id="catgrid"></div></div>
+    <div class="cbtn bok" style="display:none" onclick="submitManual()">记账</div><div class="cbtn bno" style="display:none" onclick="swipeCloseManual()">取消</div>
+</div></div></div>
+
+<div class="overlay" id="ov-catsettings" onclick="if(event.target===this)closeCatSettings()"><div class="sheet-wrap"><div class="sheet cat-settings-sheet" id="sh-catsettings"><div class="hdl" id="hdl-catsettings"></div><div class="slbl">类别管理</div><div class="cs-list" id="catSettingsList"></div><div class="cs-add" onclick="addNewCat()">+ 添加新类别</div><div class="cbtn bok" onclick="closeCatSettings()" style="margin-top:10px">完成</div></div></div></div>
+
+<div class="overlay" id="ov-lucide-picker" onclick="if(event.target===this)closeLucidePicker()" style="z-index:85"><div class="sheet-wrap"><div class="sheet" style="max-height:70vh"><div class="hdl"></div><div class="slbl">选择图标</div><div class="lucide-picker-grid" id="lucide-picker-grid"></div><div style="display:flex;gap:8px;margin-top:8px"><div class="cbtn" id="lp-emoji-btn" style="flex:1;background:var(--bdr2);color:var(--t1)">输入 Emoji</div><div class="cbtn bok" style="flex:1" onclick="closeLucidePicker()">取消</div></div></div></div></div>
+
+<div class="color-picker-backdrop" id="colorPickerBackdrop" onclick="closeColorPicker()"></div>
+<div class="color-picker-panel" id="colorPickerPanel"><div class="cpp-title" id="cppTitle">选择颜色</div><div class="hue-slider" id="cppHue"><div class="hue-thumb" id="cppHueThumb"></div></div><div class="cpp-title" style="margin-top:10px">明暗</div><div class="lit-slider" id="cppLit" style="background:linear-gradient(to right,#000,#fff)"><div class="lit-thumb" id="cppLitThumb"></div></div><div class="cpp-actions"><span class="cpp-hex" id="cppHex">#000000</span><span style="flex:1"></span><span class="cpp-reset" onclick="resetCustomColor()">重置</span><span class="cpp-close" onclick="closeColorPicker()">完成</span></div></div>
+
+<div class="overlay" id="ov-bcat-edit" onclick="if(event.target===this)closeBudgetCatEditor()"><div class="sheet-wrap"><div class="sheet bcat-sheet" style="max-height:78vh"><div class="hdl-invisible"></div><div class="bcat-hdr"><div class="bcat-title">预算类别</div><div class="bcat-add-btn" onclick="addBudgetCatNew()" aria-label="添加"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div><div class="bcat-x" onclick="closeBudgetCatEditor()" aria-label="关闭">✕</div></div><div class="bcat-hint">长按 ⋮⋮ 拖动排序 · 点击 ✕ 删除</div><div class="bcat-list" id="bcatEditList"></div></div></div></div>
+
+<div class="overlay" id="ov-iamt" onclick="if(event.target===this)closeIamt(false)"><div class="sheet-wrap"><div class="sheet sheet-flush" id="sh-iamt"><div class="manual-combo" style="margin:0"><div class="mc-calc mc-calc-grid"><div class="mcb" onclick="iaInput('7')">7</div><div class="mcb" onclick="iaInput('8')">8</div><div class="mcb" onclick="iaInput('9')">9</div><div class="mcb mcb-date" id="iaDateBtn"><span class="mdb-emo" style="pointer-events:none">📅</span><span id="iaDateLbl" style="pointer-events:none">今天</span><input type="date" id="iaDateInp" onchange="iaDateChange(this.value)" onclick="tryShowDatePicker(this,event)"></div><div class="mcb" onclick="iaInput('4')">4</div><div class="mcb" onclick="iaInput('5')">5</div><div class="mcb" onclick="iaInput('6')">6</div><div class="mcb mcb-op" onclick="iaInput('+')">+</div><div class="mcb" onclick="iaInput('1')">1</div><div class="mcb" onclick="iaInput('2')">2</div><div class="mcb" onclick="iaInput('3')">3</div><div class="mcb mcb-op" onclick="iaInput('-')">−</div><div class="mcb" onclick="iaInput('.')">.</div><div class="mcb" onclick="iaInput('0')">0</div><div class="mcb mcb-del" onclick="iaInput('B')">⌫</div><div class="mcb mcb-ok" onclick="closeIamt(true)">完成</div></div></div></div></div></div>
+
+<!-- 滚轮时间选择器弹窗 -->
+<div class="overlay" id="ov-wheel-time" onclick="if(event.target===this)closeWheelTime(false)" style="z-index:85">
+    <div class="sheet-wrap"><div class="sheet" id="sh-wheel-time" style="padding:10px 16px 14px">
+        <div class="hdl-invisible" id="hdl-wheel-time" style="height:8px"></div>
+        <div class="slbl">选择时间</div>
+        <div class="wheel-time-picker" id="wheelTimePicker">
+            <div class="wheel-col"><div class="wheel-col-label">时</div><div class="wheel-wrap" id="wheelHours"></div></div>
+            <div class="wheel-col"><div class="wheel-col-label">分</div><div class="wheel-wrap" id="wheelMinutes"></div></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:6px">
+            <div class="cbtn bno" style="flex:1" onclick="closeWheelTime(false)">取消</div>
+            <div class="cbtn bok" style="flex:1" onclick="closeWheelTime(true)">确定</div>
+        </div>
+    </div></div>
+</div>
+
+<div class="overlay" id="ov-theme-adv" onclick="if(event.target===this)closeThemeAdvanced()"><div class="sheet-wrap"><div class="sheet" id="sh-theme-adv"><div class="hdl-invisible"></div><div class="detail-hdr"><div class="slbl" style="flex:1;text-align:center;margin-left:36px">高级自定义</div><div class="detail-x" onclick="closeThemeAdvanced()">✕</div></div><div id="theme-adv-body"></div><div style="padding:8px 0 4px"><div class="action-btn" onclick="resetAllCustomColors()" style="background:var(--bdr2);color:var(--t1)">全部重置</div></div></div></div></div>
+
+<div class="overlay" id="ov-detail" onclick="if(event.target===this)closeOv('ov-detail')"><div class="sheet-wrap"><div class="sheet" id="sh-detail" style="padding-bottom:14px"><div class="hdl-invisible" id="hdl-detail" style="height:8px"></div><div class="detail-hdr"><div class="slbl" style="flex:1;text-align:center;margin-left:36px">交易详情</div><div class="detail-x" onclick="closeOv('ov-detail')" aria-label="关闭">✕</div></div><div id="detailBody"></div><div class="detail-actions"><div class="detail-fab detail-fab-edit" onclick="doEdit()" aria-label="编辑"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div><div class="detail-fab detail-fab-del" onclick="doDelete()" aria-label="删除"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></div></div></div></div></div>
+
+<div class="overlay" id="ov-delete-confirm" onclick="if(event.target===this)cancelDeleteConfirm()">
+    <div class="sheet-wrap"><div class="sheet" id="sh-delete-confirm">
+      <div class="slbl">删除确认</div>
+      <div id="deleteConfirmBody"></div>
+      <div class="cbtn bdel" onclick="executeDeleteConfirm()">确认删除</div>
+      <div class="cbtn bno" onclick="cancelDeleteConfirm()">取消</div>
+    </div></div>
+  </div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════
+//  VOICE_LEXICON
+// ══════════════════════════════════════════════════
+var BRAND_MAP={"auchan":"购物","cactus":"购物","carrefour":"购物","lidl":"购物","黑狮":"购物","金源":"购物","欧华":"购物","汉堡王":"吃","kebab":"吃","麦当劳":"吃","kfc":"吃","肯德基":"吃","兰州拉面":"吃","durum":"吃","smash":"吃","fernand":"吃","ferand":"吃","星巴克":"吃","misstea":"吃","zzyxlj":"吃","羽毛球":"玩","台球":"玩","casino":"玩","电影":"玩","演唱会":"玩","加油":"其他","停车":"其他","话费":"其他","orange":"其他","wise":"其他","酒店":"其他","驾校":"其他","牙医":"其他","理发":"其他","claude":"其他","酷狗会员":"其他","谷歌相册":"其他","post":"其他","engie":"其他","paysend":"其他"};
+var VOICE_CAT_MAP={"吃":["饭","早饭","午饭","晚饭","宵夜","夜宵","外卖","下馆子","吃饭","聚餐","kfc","麦当劳","mcdo","麦麦","汉堡王","汉堡","burger","kebab","土耳其","面","拉面","米线","麻辣烫","火锅","烧烤","bbq","smash","fernand","fernando","ferand","三明治","sandwich","panini","咖啡","星巴克","starbucks","瑞幸","manner","拿铁","美式","奶茶","喜茶","霸王茶姬","果汁","饮料","可乐","雪碧","酒","啤酒","红酒","白酒","鸡尾酒","面包","蛋糕","甜品","冰淇淋","雪糕","巧克力","饼干","水果","橘子","橙子","苹果","香蕉","西瓜","葡萄","草莓","菜","买菜","食材","肉","鸡蛋","牛奶","酸奶","durum","pizza","披萨","兰州拉面","面馆","河粉","麻辣香锅","串串","big fernand","big ferand","hotdog","snack","snacks","早餐","午餐","晚餐","brunch","下午茶","misstea","卡布奇诺","cappuccino","摩卡","espresso","coco","一点点","蜜雪冰城","boba","珍珠奶茶","红豆奶茶","奶盖","zzyxlj","印度菜","泰国菜","越南菜","日料","韩餐","中餐","西餐","ice tea","evian","矿泉水","气泡水","意大利面","pasta","spaghetti","牛排","steak","海鲜","寿司","sushi","sashimi","拌饭","盖饭","便当","热巧","热可可","豆浆","油条","包子","饺子","馒头","煎饼","小笼包","炸鸡","炸物","早餐面包"],"玩":["玩","娱乐","电影","电影院","ktv","唱歌","桌游","密室","剧本杀","游戏","充值","皮肤","steam","ps5","switch","手游","氪金","运动","健身","健身房","私教","瑜伽","游泳","羽毛球","网球","篮球","足球","乒乓球","球线","球拍","羽毛球拍","网球拍","球鞋","旅游","出去玩","门票","景点","公园","博物馆","展览","演唱会","酒吧","夜店","club","casino","赌场","台球","桌球","斯诺克","跑步","骑行","滑雪","滑冰","密室逃脱","disco","彩票","王者荣耀","英雄联盟","lol","xbox","音乐节","科技馆","水族馆","动物园","游乐园","摩天轮","娃娃机","抓娃娃","电玩","电玩城","潮玩","melusina","旅行","出游","度假","民宿"],"购物":["买","购物","shopping","下单","网购","京东","淘宝","拼多多","天猫","亚马逊","amazon","shein","uniqlo","优衣库","zara","h&m","衣服","鞋","鞋子","外套","裤子","袜子","内衣","帽子","包","化妆品","护肤品","口红","面膜","洗面奶","洗发水","沐浴露","手机","电脑","耳机","充电器","数据线","键盘","鼠标","纸巾","牙膏","牙刷","洗衣液","垃圾袋","cactus","家乐福","carrefour","auchan","lidl","leclerc","宠物","猫粮","狗粮","宠物店","屎哥","黑狮","金源","欧华","便利店","711","全家","bershka","hm","pull bear","muji","无印良品","nike","adidas","耐克","裙子","羽绒服","t恤","短袖","卫衣","毛衣","跑鞋","靴子","拖鞋","凉鞋","项链","手链","耳环","戒指","手表","包包","钱包","背包","ipad","iphone","airpods","充电宝","热水壶","椅子","家具","锅","碗","盘子","洗洁精","文具","笔","本子","口罩","礼物","红包","份子钱","随礼","新婚红包","生日红包","压岁钱","新年红包"],"其他":["停车","停车费","加油","油费","汽油","停车场","高速","过路费","etc","打车","出租车","uber","taxi","滴滴","地铁","公交","公交车","火车","高铁","动车","飞机","机票","话费","流量","宽带","网费","水费","电费","燃气","煤气","物业","房租","医院","看病","药","药店","诊所","牙医","体检","理发","美发","美甲","美容","spa","按摩","运营商","free","orange","sfr","bouygues","中国移动","中国联通","中国电信","会员","订阅","claude","chatgpt","netflix","youtube","spotify","icloud","鲨鱼记账","记账","导出","导出数据","aral","加油站","续费","wise","酒店","民宿","airbnb","booking","engie","vpn","wifi","post","邮寄","快递","cns","报销","驾校","驾照","paysend","paypal","电池","维修","保养","换胎","机油"]};
+var VOICE_INCOME_KW=["工资","薪水","薪资","奖金","年终奖","提成","返现","退款","退钱","收到","进账","到账","赚","赚到","挣","挣到","中奖","彩票","红包","压岁钱","casino赢","赢了","赌赢","报销","补贴","津贴","分红","利息","理财收益","卖","卖掉","阿妈给","老妈给","阿爸给","老爸给","阿榕给","姐给","哥给","奇奇送","退我","退款","退回","退还","engie退","还我","还了我","还的","还现金","小费","tips","给的","给了我","转我","转给我","转账给我","收的红包","收红包","阿妈转","份子钱","随礼收","正辉家","代班","补助","大学补助","给我","赢了","赌输","退"];
+var VOICE_SAVINGS_KW=["存","存钱","储蓄","存进","存到","定期","余额宝","理财","目标","攒","攒钱","存了","攒了","储蓄目标"];
+
+function voiceDetectCategory(text){var lower=text.toLowerCase();var bk=Object.keys(BRAND_MAP).sort(function(a,b){return b.length-a.length});for(var i=0;i<bk.length;i++){if(lower.indexOf(bk[i].toLowerCase())!==-1)return BRAND_MAP[bk[i]]}var PRI=["吃","玩","购物","其他"];for(var p=0;p<PRI.length;p++){var words=VOICE_CAT_MAP[PRI[p]]||[];for(var w=0;w<words.length;w++){if(lower.indexOf(words[w].toLowerCase())!==-1)return PRI[p]}}return"其他"}
+function voiceDetectType(text){if(/赌我/.test(text)&&/不/.test(text))return"income";var lower=text.toLowerCase();for(var i=0;i<VOICE_INCOME_KW.length;i++){if(lower.indexOf(VOICE_INCOME_KW[i].toLowerCase())!==-1)return"income"}for(var j=0;j<VOICE_SAVINGS_KW.length;j++){if(lower.indexOf(VOICE_SAVINGS_KW[j].toLowerCase())!==-1)return"savings"}return"expense"}
+function voiceDetectCurrency(text,defaultCurrency){var hasRmb=/rmb|人民币|¥|￥/i.test(text)||(/元|块/.test(text)&&!/欧元/.test(text));var hasEur=/欧|€|euro/i.test(text);if(hasEur&&hasRmb)return{currency:defaultCurrency,needConfirm:true};if(hasEur)return{currency:"EUR",needConfirm:false};if(hasRmb)return{currency:"CNY",needConfirm:false};return{currency:defaultCurrency,needConfirm:false}}
+function voiceExtractAmount(text){var addM=text.match(/(\d+(?:\.\d+)?)\s*[+＋]\s*(\d+(?:\.\d+)?)/);if(!addM)addM=text.match(/(\d+(?:\.\d+)?)加(\d+(?:\.\d+)?)/);if(addM)return{amount:parseFloat((parseFloat(addM[1])+parseFloat(addM[2])).toFixed(2))};var giveM=text.match(/(?:给我|还我|输我|赔我)\s*(\d+(?:\.\d+)?)/);if(giveM)return{amount:parseFloat(giveM[1])};var curMatches=[],reCur=/(\d+(?:\.\d+)?)\s*(?:欧|€|rmb|人民币|元|块)/gi,mc;while((mc=reCur.exec(text))!==null)curMatches.push(parseFloat(mc[1]));if(curMatches.length){var afterCur=text.replace(/\d+(?:\.\d+)?\s*(?:欧|€|rmb|人民币|元|块)/gi,"◊");var plainNums=[],rePl=/(\d+(?:\.\d+)?)/g,pm;while((pm=rePl.exec(afterCur))!==null){var n=parseFloat(pm[1]);var ctx=afterCur.slice(Math.max(0,pm.index-1),pm.index+pm[0].length+2);if(/年|月|日|号|点|时|个|次/.test(ctx))continue;if(n>=1900&&n<=2100&&pm[0].length===4)continue;plainNums.push(n)}var lastCur=curMatches[curMatches.length-1];if(plainNums.length&&Math.max.apply(null,plainNums)>lastCur)return{amount:Math.max.apply(null,plainNums)};return{amount:lastCur}}var cleanText=text.replace(/\d{1,4}\s*年/g," ").replace(/\d{1,2}\s*月/g," ").replace(/\d{1,2}\s*[号日]/g," ").replace(/\d{1,2}\s*[点时]/g," ").replace(/(\d+)\s*(?:个|份|次|条|张|只|件|套|台|本|双|对|瓶|罐|箱|袋)/g," ");var allNums=[],re2=/(\d+(?:\.\d+)?)/g,am;while((am=re2.exec(cleanText))!==null){var n2=parseFloat(am[1]);if(n2>=1900&&n2<=2100&&am[0].length===4)continue;allNums.push(n2)}if(!allNums.length)return null;return{amount:Math.max.apply(null,allNums)}}
+// ── 语音记账：描述清洗 ──
+function voiceCleanDesc(text){
+  var desc=text;
+  // 1. 去掉段首分隔连接词（"然后"/"还有"/"另外"等）— 与 voiceSplitInput 关键词同步
+  desc=desc.replace(/^(?:还有|然后|另外|再加|再有|外加|顺便|顺手|顺道|接着|紧接着|跟着|紧跟着|之后|后来|随后|跟住|继续|再来|又来|再去|又去|末了|最后|另|and then|then)\s*/i,"");
+  // 1b. 去掉因为标点切分留下的开头小词（"还""又""再"+动词）
+  desc=desc.replace(/^(?:还|又|再)\s*/,"");
+  // 2. 去掉由 voiceSplitInput 注入的日期前缀（"今天/昨天/前天"）
+  desc=desc.replace(/^(?:今天|昨天|前天|今日)\s*/,"");
+  // 3. 去掉末尾金额：数字（含小数）+ 可选加法式 + 可选货币标记
+  //    仅处理末尾，中间的数字（如"1.99欧"）完整保留
+  desc=desc.replace(/\s*\d+(?:\.\d+)?(?:\s*[+＋]\s*\d+(?:\.\d+)?)?\s*(?:rmb|欧|欧元|元|块|块钱|€|¥|￥|\$)?\s*$/i,"");
+  // 4. trim
+  desc=desc.trim();
+  return desc.slice(0,30)||"消费";
+}
+function voiceExtractDate(text){var now=new Date(),base=new Date(),label="";if(/昨天|昨日|昨儿/.test(text)){base.setDate(base.getDate()-1);label=(base.getMonth()+1)+"月"+base.getDate()+"日"}else if(/前天/.test(text)){base.setDate(base.getDate()-2);label=(base.getMonth()+1)+"月"+base.getDate()+"日"}else if(/今天|今日|今儿/.test(text)){label=(now.getMonth()+1)+"月"+now.getDate()+"日"}var fd=text.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*[号日]/);if(fd){base=new Date(now.getFullYear(),parseInt(fd[1])-1,parseInt(fd[2]),12);label=fd[1]+"月"+fd[2]+"日"}return{ts:base.getTime(),label:label}}
+// ── 语音记账：切分多笔（继承日期前缀）──
+function voiceSplitInput(text){
+  var s=text;
+  // L_FIX3: 扩充关键词，并把逗号 / 句号 / 分号 当作分隔符
+  // 强分隔词：直接切分
+  var STRONG_SEPS=[
+    "还有","然后","另外","再加","再有","外加",
+    "顺便","顺手","顺道","接着","紧接着","跟着","紧跟着",
+    "之后","后来","随后","跟住","继续",
+    "再来","又来","再去","又去",
+    "末了","最后","另",
+    "and then","then"
+  ];
+  STRONG_SEPS.forEach(function(sep){s=s.split(sep).join("‖");});
+  // 条件分隔："还/又/再"+ 动词 才切（避免误伤"还款 / 又一 / 再说"等）
+  var VERB_AFTER="吃玩买加用乘坐去看喝花付付款打交付报订";
+  s=s.replace(new RegExp(" 还(?=["+VERB_AFTER+"])","g"),"‖");
+  s=s.replace(new RegExp(" 又(?=["+VERB_AFTER+"])","g"),"‖");
+  s=s.replace(new RegExp(" 再(?=["+VERB_AFTER+"])","g"),"‖");
+  // 标点分隔：中英文逗号、中文句号、分号、顿号
+  s=s.replace(/[，,；;。、]+/g,"‖");
+  // 切分 + 安全过滤：每段必须含数字才算独立交易（防止描述里的逗号误切成空段）
+  var rawParts=s.split("‖").map(function(p){return p.trim();}).filter(function(p){return p.length>0;});
+  // 如果切分后只剩 1 段，原文返回
+  if(rawParts.length<=1)return[text.trim()];
+  // 安全合并：若某段无数字，归并到前一段
+  var parts=[];
+  rawParts.forEach(function(p){
+    if(/\d/.test(p)){parts.push(p);}
+    else if(parts.length>0){parts[parts.length-1]+=" "+p;}
+    else{parts.push(p);}
+  });
+  if(parts.length<=1)return[text.trim()];
+  // 继承首段日期词到后续段
+  var dateM=parts[0].match(/^(今天|昨天|前天|[上本]周)/);
+  var datePfx=dateM?dateM[1]:"";
+  if(datePfx)parts[0]=parts[0].slice(datePfx.length).trim();
+  if(datePfx)parts=parts.map(function(p,i){return(i>0&&!/今天|昨天|前天/.test(p))?datePfx+p:p;});
+  return parts;
+}
+// L_FIX4: 强制把 AI 识别的类别映射到当前类型允许的新分类组
+// 支出 → 吃/买/车/运动/其他；收入 → 工资/现金/转账/其他；储蓄 → 储蓄/股票/资产/其他
+function voiceRemapCategoryByType(text,type){
+  var lower=String(text||"").toLowerCase();
+  if(type==="income"){
+    if(/工资|薪水|薪资|薪金|月薪|年薪|奖金|年终奖|提成|分红|利息|理财收益|工钱|salary|wage|bonus/i.test(text))return"工资";
+    if(/现金|cash|领钱|发现金|收现金|手现金|纸币|硬币/i.test(text))return"现金";
+    if(/转账|转我|转给我|微信转|支付宝转|银行转|汇款|wire|transfer|wise|paypal|paysend|venmo|revolut|发红包|微信红包|支付宝红包|发我红包/i.test(text))return"转账";
+    return"其他";
+  }
+  if(type==="savings"){
+    if(/股票|stock|股市|基金|fund|etf|公募|私募|定投/i.test(text))return"股票";
+    if(/资产|asset|投资|理财|房产|不动产|黄金|gold|加密|crypto|btc|eth|比特币|以太坊/i.test(text))return"资产";
+    if(/储蓄|存钱|存款|定存|活期|deposit|saving/i.test(text))return"储蓄";
+    return"其他";
+  }
+  // expense
+  // 车
+  if(/打车|出租车|uber|taxi|滴滴|地铁|公交|公交车|火车|高铁|动车|飞机|机票|加油|油费|汽油|gasoline|petrol|停车|停车场|停车费|高速|过路费|过桥费|etc|维修|保养|换胎|机油|洗车|车票|汽车|租车|car ?rental|过户|车险|driving|驾驶/i.test(text))return"车";
+  // 运动
+  if(/健身|瑜伽|游泳|羽毛球|网球|篮球|足球|乒乓球|跑步|骑行|滑雪|滑冰|球拍|球鞋|台球|桌球|斯诺克|球线|私教|健身房|gym|yoga|fitness|sport|workout|训练课|跑鞋|攀岩|拳击|马拉松/i.test(text))return"运动";
+  // 吃
+  var foodKW=(typeof VOICE_CAT_MAP!=="undefined"&&VOICE_CAT_MAP["吃"])||[];
+  for(var i=0;i<foodKW.length;i++){if(lower.indexOf(foodKW[i].toLowerCase())!==-1)return"吃";}
+  // 买
+  var shopKW=(typeof VOICE_CAT_MAP!=="undefined"&&VOICE_CAT_MAP["购物"])||[];
+  for(var j=0;j<shopKW.length;j++){if(lower.indexOf(shopKW[j].toLowerCase())!==-1)return"买";}
+  // 兜底：购物品牌
+  if(typeof BRAND_MAP!=="undefined"){
+    var bkeys=Object.keys(BRAND_MAP).sort(function(a,b){return b.length-a.length;});
+    for(var k=0;k<bkeys.length;k++){if(lower.indexOf(bkeys[k].toLowerCase())!==-1){var v=BRAND_MAP[bkeys[k]];if(v==="吃")return"吃";if(v==="购物")return"买";}}
+  }
+  return"其他";
+}
+function parseVoiceText(text,defaultCurrency){defaultCurrency=defaultCurrency||settings.defaultCurrency||"EUR";var segs=voiceSplitInput(text);return segs.map(function(seg){seg=seg.trim();if(!seg)return null;var curInfo=voiceDetectCurrency(seg,defaultCurrency);var amtInfo=voiceExtractAmount(seg);var type=voiceDetectType(seg);var dateInfo=voiceExtractDate(seg);var desc=voiceCleanDesc(seg);var needAmt=!amtInfo||amtInfo.amount===null||amtInfo.amount<=0;
+  // L_FIX4: 强制按类型重映射类别，确保 AI 输出严格落在新分类组里
+  var mappedCat=voiceRemapCategoryByType(seg,type);
+  // 双保险：如果不在该类型的允许列表里，归到"其他"
+  var allowed=(typeof DEFAULT_CATS_BY_TYPE!=="undefined"&&DEFAULT_CATS_BY_TYPE[type])?DEFAULT_CATS_BY_TYPE[type].map(function(c){return c.name;}):null;
+  if(allowed&&allowed.indexOf(mappedCat)===-1)mappedCat="其他";
+  return{ok:!needAmt,needAmountInput:needAmt,needCurrencyConfirm:curInfo.needConfirm,amount:needAmt?null:amtInfo.amount,currency:curInfo.currency,category:mappedCat,type:type,desc:desc,ts:dateInfo.ts,timeLabel:dateInfo.label,timePrecision:dateInfo.label?"day":"exact",yearOnly:null};}).filter(function(r){return r!==null})}
+
+// ── SFX ──
+var SFX={enabled:localStorage.getItem("sfxEnabled")!=="false",volume:parseFloat(localStorage.getItem("sfxVolume")||"0.7"),ctx:null,_last:{},init:function(){if(!this.ctx){try{this.ctx=new(window.AudioContext||window.webkitAudioContext)()}catch(e){this.ctx=null}}},_tone:function(freq,dur,vol,opts){if(!this.ctx)return;var t=this.ctx.currentTime;var o=this.ctx.createOscillator();var g=this.ctx.createGain();o.type=(opts&&opts.type)||"sine";o.frequency.setValueAtTime(freq,t);if(opts&&opts.glide){o.frequency.exponentialRampToValueAtTime(opts.glide,t+dur/1000)}var v=(vol!==undefined?vol:1)*this.volume;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+0.005);g.gain.exponentialRampToValueAtTime(0.0001,t+dur/1000);o.connect(g);g.connect(this.ctx.destination);o.start(t);o.stop(t+dur/1000+0.02)},play:function(type){if(!this.enabled)return;var now=Date.now();if(this._last[type]&&now-this._last[type]<50)return;this._last[type]=now;this.init();if(!this.ctx)return;if(this.ctx.state==="suspended"){try{this.ctx.resume()}catch(e){}}switch(type){case"tap":this._tone(800,30,0.45);break;case"tap-alt":this._tone(600,40,0.50);break;case"success":this._tone(880,90,0.55);var s=this;setTimeout(function(){s._tone(1200,120,0.55)},80);break;case"tab":this._tone(1000,25,0.30);break;case"open":this._tone(400,80,0.50,{glide:700});break;case"close":this._tone(700,80,0.50,{glide:400});break;case"delete":this._tone(200,60,0.65);break;case"error":this._tone(300,55,0.55);var s2=this;setTimeout(function(){s2._tone(300,55,0.55)},80);break;default:this._tone(800,30,0.4)}}};
+var VIB={enabled:localStorage.getItem("vibEnabled")!=="false",go:function(pat){if(!this.enabled)return;try{if(navigator.vibrate)navigator.vibrate(pat)}catch(e){}}};
+function fxTap(){SFX.play("tap");VIB.go(12)}function fxTapAlt(){SFX.play("tap-alt");VIB.go(15)}function fxSuccess(){SFX.play("success");VIB.go([20,80,20])}function fxTab(){SFX.play("tab");VIB.go(8)}function fxOpen(){SFX.play("open");VIB.go(12)}function fxClose(){SFX.play("close");VIB.go(10)}function fxDelete(){SFX.play("delete");VIB.go(30)}function fxError(){SFX.play("error");VIB.go([40,50,40])}
+function unlockSfx(){SFX.init();if(SFX.ctx&&SFX.ctx.state==="suspended"){try{SFX.ctx.resume()}catch(e){}}document.removeEventListener("touchstart",unlockSfx);document.removeEventListener("click",unlockSfx);document.removeEventListener("keydown",unlockSfx)}
+document.addEventListener("touchstart",unlockSfx,{once:true,passive:true});document.addEventListener("click",unlockSfx,{once:true});document.addEventListener("keydown",unlockSfx,{once:true});
+
+var LUCIDE={"list":'<line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/>',"bar-chart-3":'<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',"target":'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',"settings":'<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',"utensils":'<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',"shopping-bag":'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',"gamepad-2":'<line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258A4 4 0 0 0 17.32 5z"/>',"package":'<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',"coffee":'<path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" x2="6" y1="2" y2="4"/><line x1="10" x2="10" y1="2" y2="4"/><line x1="14" x2="14" y1="2" y2="4"/>',"store":'<path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/>',"car":'<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',"dumbbell":'<path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/>',"film":'<rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" x2="7" y1="2" y2="22"/><line x1="17" x2="17" y1="2" y2="22"/><line x1="2" x2="22" y1="12" y2="12"/><line x1="2" x2="7" y1="7" y2="7"/><line x1="2" x2="7" y1="17" y2="17"/><line x1="17" x2="22" y1="17" y2="17"/><line x1="17" x2="22" y1="7" y2="7"/>',"heart-pulse":'<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/>',"home":'<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',"wallet":'<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>',"piggy-bank":'<path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8.5 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z"/><path d="M2 9v1c0 1.1.9 2 2 2h1"/><path d="M16 11h0"/>',"ticket":'<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>',"search":'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',"trash-2":'<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>',"briefcase":'<rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',"music":'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',"plane":'<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',"gift":'<path d="M20 12v10H4V12"/><path d="M2 7h20v5H2z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>',"gem":'<path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/>',"flame":'<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',"book":'<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>',"camera":'<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',"heart":'<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/>',"star":'<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',"sun":'<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',"moon":'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>'};
+function lucideSvg(name,size,strokeWidth){size=size||20;strokeWidth=strokeWidth||1.6;var body=LUCIDE[name];if(!body)return"";return'<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+strokeWidth+'" stroke-linecap="round" stroke-linejoin="round">'+body+'</svg>'}
+function renderIconValue(val,size,sw){if(!val)return"";if(typeof val==="string"&&val.indexOf("lucide:")===0){return lucideSvg(val.substr(7),size||18,sw||1.6)}return val}
+
+var CAT_LIST=["餐饮","超市","购物","交通","运动","娱乐","医疗","生活","工资","储蓄","彩票","其他"];
+var CAT_LUCIDE={"餐饮":"coffee","超市":"store","购物":"shopping-bag","交通":"car","运动":"dumbbell","娱乐":"film","医疗":"heart-pulse","生活":"home","工资":"wallet","储蓄":"piggy-bank","彩票":"ticket","其他":"package","吃":"utensils","玩":"gamepad-2"};
+var CAT_ICO={};(function(){for(var k in CAT_LUCIDE){CAT_ICO[k]=lucideSvg(CAT_LUCIDE[k],22,1.6)}})();
+var CAT_CLR={餐饮:"#E8845A",超市:"#5BAF72",购物:"#6B8FD4",交通:"#D4A843",运动:"#7B6BD4",娱乐:"#D46B8F",医疗:"#54B8C8",生活:"#8B8B8B",彩票:"#C8A854",其他:"#AAAAAA"};
+var THEMES=[{id:"yellow",label:"耀金",h:"#FFB700",bg:"#FFEEA1"},{id:"mint",label:"薄荷",h:"#52B788",bg:"#D8F3DC"},{id:"ocean",label:"雾蓝",h:"#2C7DA0",bg:"#A9D6E5"},{id:"pink",label:"轻梦",h:"#B080CC",bg:"#FFCBF2"},{id:"meadow",label:"草甸",h:"#D4A373",bg:"#FAEDCD"},{id:"gray",label:"秩序",h:"#1A1A1A",bg:"#E8E8E8"},{id:"white",label:"极简",h:"#000000",bg:"#F8F9FA"},{id:"dark",label:"极夜",h:"#FFFFFF",bg:"#000000"}];
+var ACCENT_COLORS=["#111111","#1B3A7A","#8B2A2A","#1A6B4A","#6B2A8B","#B86A00","#2A6B8B"];
+
+var txs=[],settings={defaultCurrency:"EUR",eurToCny:7.8,theme:"gray",accent:"",accentHue:null,customColors:{}},budgets={},goals=[],deletedSugs=[];
+var viewYear=new Date().getFullYear(),viewMonth=new Date().getMonth();
+var pickerYear=new Date().getFullYear(),pickerYM=false;
+var pending=[],detailIdx=-1,editIdx=-1,currentTab="main",listSwipeOpenTi=null,deleteConfirmIdx=-1;
+var SWIPE_DEL_MAX=120,SWIPE_ACTIVATE_PX=10,SWIPE_SNAP_HALF=40;
+var _wheelHours=0,_wheelMins=0,_wheelCallback=null;
+
+function pad(n){return String(n).padStart(2,"0")}
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function loadAll(){try{var r=lsGet("acct_txs");if(r)txs=JSON.parse(r)}catch(e){txs=[]}try{var s=lsGet("acct_settings");if(s)settings=Object.assign(settings,JSON.parse(s))}catch(e){}try{var b=lsGet("acct_budgets");if(b)budgets=JSON.parse(b)}catch(e){}try{var g=lsGet("acct_goals");if(g)goals=JSON.parse(g)}catch(e){}try{var ds=lsGet("acct_deletedSugs");if(ds)deletedSugs=JSON.parse(ds)}catch(e){}var un=lsGet("userName");if(un){var el=document.getElementById("user-name-disp");if(el)el.textContent=un}}
+function saveTxs(next){txs=next;lsSet("acct_txs",JSON.stringify(next))}
+function saveSettings(){lsSet("acct_settings",JSON.stringify(settings))}
+function saveBudgets(){lsSet("acct_budgets",JSON.stringify(budgets))}
+function saveGoals(){lsSet("acct_goals",JSON.stringify(goals))}
+function saveDeletedSugs(){lsSet("acct_deletedSugs",JSON.stringify(deletedSugs))}
+function hslToHex(h,s,l){s/=100;l/=100;var c=(1-Math.abs(2*l-1))*s,x=c*(1-Math.abs((h/60)%2-1)),m=l-c/2,r=0,g=0,b=0;if(h<60){r=c;g=x;b=0}else if(h<120){r=x;g=c;b=0}else if(h<180){r=0;g=c;b=x}else if(h<240){r=0;g=x;b=c}else if(h<300){r=x;g=0;b=c}else{r=c;g=0;b=x}function hx(v){var n=Math.round((v+m)*255).toString(16);return n.length<2?"0"+n:n}return"#"+hx(r)+hx(g)+hx(b)}
+function hexToHsl(hex){hex=hex.replace("#","");if(hex.length===3)hex=hex.split("").map(function(c){return c+c}).join("");var r=parseInt(hex.substr(0,2),16)/255,g=parseInt(hex.substr(2,2),16)/255,b=parseInt(hex.substr(4,2),16)/255;var mx=Math.max(r,g,b),mn=Math.min(r,g,b),h=0,s=0,l=(mx+mn)/2;if(mx!==mn){var d=mx-mn;s=l>0.5?d/(2-mx-mn):d/(mx+mn);if(mx===r)h=((g-b)/d+(g<b?6:0));else if(mx===g)h=(b-r)/d+2;else h=(r-g)/d+4;h*=60}return{h:Math.round(h),s:Math.round(s*100),l:Math.round(l*100)}}
+function contrastText(hex){hex=hex.replace("#","");if(hex.length===3)hex=hex.split("").map(function(c){return c+c}).join("");var rr=parseInt(hex.substr(0,2),16),gg=parseInt(hex.substr(2,2),16),bb=parseInt(hex.substr(4,2),16);var lum=0.299*rr+0.587*gg+0.114*bb;return lum>140?"#111":"#FFF"}
+var ADV_COLOR_KEYS=[{label:"顶部背景",varName:"--hero-bg"},{label:"页面背景",varName:"--bg"},{label:"卡片背景",varName:"--card"},{label:"次卡背景",varName:"--card-alt"},{label:"底部导航",varName:"--nav-bg"},{label:"主文字色",varName:"--t1"},{label:"次文字色",varName:"--t2"},{label:"辅文字色",varName:"--t3"},{label:"强调色",varName:"--acc"},{label:"分隔线",varName:"--bdr"}];
+function getCurrentAccent(){if(settings.customColors&&settings.customColors["--acc"])return settings.customColors["--acc"];if(settings.accentHue!==null&&settings.accentHue!==undefined)return hslToHex(settings.accentHue,80,50);if(settings.accent)return settings.accent;return getEffectiveColor("--acc")}
+function getEffectiveColor(varName){if(settings.customColors&&settings.customColors[varName])return settings.customColors[varName];if(varName==="--acc"){if(settings.accentHue!==null&&settings.accentHue!==undefined)return hslToHex(settings.accentHue,80,50);if(settings.accent)return settings.accent}var v=getComputedStyle(document.body).getPropertyValue(varName).trim();if(!v)v=getComputedStyle(document.documentElement).getPropertyValue(varName).trim();if(v.indexOf("rgb")===0){var m=v.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/);if(m){return"#"+[1,2,3].map(function(i){var n=parseInt(m[i],10).toString(16);return n.length<2?"0"+n:n}).join("")}}return v||"#888888"}
+function applyTheme(){var t=settings.theme||"gray";document.body.className="theme-"+t;var r=document.body;["--acc","--acc-t","--hero-bg","--bg","--card","--card-alt","--nav-bg","--t1","--t2","--t3","--bdr"].forEach(function(v){r.style.removeProperty(v)});var accentHex=null;if(settings.accentHue!==null&&settings.accentHue!==undefined){accentHex=hslToHex(settings.accentHue,80,50)}else if(settings.accent){accentHex=settings.accent}if(accentHex){r.style.setProperty("--acc",accentHex);r.style.setProperty("--acc-t",contrastText(accentHex))}if(settings.customColors){Object.keys(settings.customColors).forEach(function(k){var v=settings.customColors[k];if(v)r.style.setProperty(k,v);if(k==="--acc")r.style.setProperty("--acc-t",contrastText(v))})}}
+function initSwipe(sheetId,hdlId,onClose){var sh=document.getElementById(sheetId),hdl=document.getElementById(hdlId);if(!sh||!hdl)return;var sy=0,cy=0,drag=false;function start(e){var t=e.touches?e.touches[0]:e;sy=t.clientY;cy=t.clientY;drag=true;sh.style.transition="none"}function move(e){if(!drag)return;var t=e.touches?e.touches[0]:e;cy=t.clientY;var dy=Math.max(0,cy-sy);sh.style.transform="translateY("+dy+"px)";if(dy>10&&e.cancelable)e.preventDefault()}function end(){if(!drag)return;drag=false;sh.style.transition="transform 0.3s cubic-bezier(.32,.72,0,1)";var dy=cy-sy;if(dy>100){sh.style.transform="translateY(120%)";setTimeout(function(){if(onClose)onClose();sh.style.transform="";sh.style.transition=""},280)}else{sh.style.transform="";setTimeout(function(){sh.style.transition=""},300)}}hdl.addEventListener("touchstart",start,{passive:false});hdl.addEventListener("touchmove",move,{passive:false});hdl.addEventListener("touchend",end)}
+/* ── 导航已迁移至 src/ui/components/nav.js（attachNavClicks + showTab）── */
+
+/* ── 语音解析已迁移至 src/domain/voice/ ── */
+
+function rate(){return settings.eurToCny||7.8}
+function netV(t){var v=t.currency==="CNY"?t.amount/rate():t.amount;return t.type==="expense"?-v:v}
+function sumT(arr,type){return arr.filter(function(t){return t.type===type||(t.type==="net_income"&&type==="income")}).reduce(function(a,t){return a+(t.currency==="CNY"?t.amount/rate():t.amount)},0)}
+function amtC(t){return t.type==="income"||t.type==="net_income"?"#1A7A40":t.type==="savings"?"#2255AA":"#CC2222"}
+function fmtA(t){return(t.type==="expense"?"−":"+")+t.amount.toFixed(2)+" "+(t.currency==="CNY"?"¥":"€")}
+function typeL(t){return{expense:"支出",income:"收入",savings:"储蓄",net_income:"支出但获得"}[t]||"支出"}
+function fmtLabel(t){if(t.timeLabel)return t.timeLabel;var d=new Date(t.ts);var base=(d.getMonth()+1)+"月"+d.getDate()+"日";if(!t.timePrecision||t.timePrecision==="day"||t.timePrecision==="month"||t.timePrecision==="year_only")return base;return base+" "+pad(d.getHours())+":"+pad(d.getMinutes())}
+var LIST_WK=["星期日","星期一","星期二","星期三","星期四","星期五","星期六"];
+function groupListLbl(t){var d=new Date(t.ts),prec=t.timePrecision||"";if(prec==="month")return pad(d.getMonth()+1)+"月";if(prec==="year_only")return d.getFullYear()+"年";return pad(d.getMonth()+1)+"月"+pad(d.getDate())+"日  "+LIST_WK[d.getDay()]}
+function listTimInnerText(t){var prec=t.timePrecision||"now";if(prec==="month"||prec==="year_only")return null;var d=new Date(t.ts);if(t.timePhrase&&prec==="exact")return pad(d.getHours())+":"+pad(d.getMinutes());if(t.timePhrase&&prec==="daytime")return t.timePhrase;if(prec==="day")return null;return pad(d.getHours())+":"+pad(d.getMinutes())}
+function listTimBlockHtml(t){var txt=listTimInnerText(t);var hide=txt?"":" style='display:none'";return'<div class="tim"'+hide+' data-idx="'+txs.indexOf(t)+'" onclick="event.stopPropagation();openWheelTimeForTx('+txs.indexOf(t)+')"><span class="tim-date" data-role="time">'+(txt||"")+'</span></div>'}
+function dayL(ts){var d=new Date(ts);return d.getFullYear()+"年"+(d.getMonth()+1)+"月"+d.getDate()+"日"}
+function fmtFull(t){var d=new Date(t.ts);var datePart=d.getFullYear()+"年"+(d.getMonth()+1)+"月"+d.getDate()+"日";if(t.timePrecision==="month")return d.getFullYear()+"年"+(d.getMonth()+1)+"月";if(t.timePrecision==="year_only")return d.getFullYear()+"年";if(t.timePhrase&&t.timePrecision==="exact")return datePart+" "+pad(d.getHours())+":"+pad(d.getMinutes());if(t.timePhrase&&t.timePrecision==="daytime")return datePart+" "+t.timePhrase;return datePart+" "+pad(d.getHours())+":"+pad(d.getMinutes())}
+function getTopDescs(limit,exclude){var freq={};txs.forEach(function(t){if(t.desc&&t.desc.length>1&&t.desc!==t.category)freq[t.desc]=(freq[t.desc]||0)+1});return Object.keys(freq).filter(function(d){return d!==exclude&&deletedSugs.indexOf(d)===-1}).sort(function(a,b){return freq[b]-freq[a]}).slice(0,limit||10)}
+
+function changeMonth(d){viewMonth+=d;if(viewMonth>11){viewMonth=0;viewYear++}if(viewMonth<0){viewMonth=11;viewYear--}render();if(currentTab==="analysis")renderAnalysis()}
+function render(){
+    var mo=txs.filter(function(t){var d=new Date(t.ts);return d.getMonth()===viewMonth&&d.getFullYear()===viewYear});
+    // ── Hero 渲染 ──
+    // 主路径：模块版（src/ui/tabs/main.js renderHero）
+    //   把 inline 视图状态/数据同步到 store，setTxs 会触发 store.on("txs:changed") → renderHero
+    //   见 src/ARCHITECTURE.md "渐进迁移操作手册"
+    if(window.acct){
+        window.acct.tabs.mainTab.setViewYearMonth(viewYear,viewMonth);
+        window.acct.store.setSettings(settings);
+        window.acct.store.setTxs(txs);
+    }else{
+        // Fallback：模块尚未加载完时，用 inline 旧逻辑保证首屏不空白。
+        // 模块 bootstrap 完成后会接管，此分支基本不会再走到。
+        var net=mo.reduce(function(a,t){return a+netV(t)},0);
+        document.getElementById("hnet").textContent=(net>=0?"+":"−")+Math.abs(net).toFixed(2)+" €";
+        document.getElementById("hperiod").textContent=viewYear+"年 · "+(viewMonth+1)+"月";
+        document.getElementById("navTitle").textContent=viewYear+"年"+(viewMonth+1)+"月 ▾";
+        var anP=document.getElementById("an-period");if(anP)anP.textContent=viewYear+"年"+(viewMonth+1)+"月 ▾";
+        var incEUR=sumT(mo,"income"),expEUR=sumT(mo,"expense"),savEUR=sumT(mo,"savings");
+        var dispCur=settings.displayCurrency||"EUR";var rateNow=rate();
+        var inc=dispCur==="CNY"?incEUR*rateNow:incEUR,exp=dispCur==="CNY"?expEUR*rateNow:expEUR,sav=dispCur==="CNY"?savEUR*rateNow:savEUR;
+        var dispSym=dispCur==="CNY"?"¥":"€";
+        document.getElementById("sin").textContent=inc.toFixed(2)+" "+dispSym;
+        document.getElementById("sout").textContent=exp.toFixed(2)+" "+dispSym;
+        document.getElementById("ssave").textContent=sav.toFixed(2)+" "+dispSym;
+        var ctb=document.getElementById("curToggleBtn");if(ctb)ctb.textContent=dispSym;
+        function setEl(id,v){var el=document.getElementById(id);if(el)el.textContent=v}
+        function splitNum(n){var s=n.toFixed(2),p=s.indexOf(".");return{int:s.slice(0,p),dec:s.slice(p)}}
+        var moPad=pad(viewMonth+1);setEl("a2-year",viewYear+"年");setEl("a2-month",moPad);
+        var incS=splitNum(inc),expS=splitNum(exp);setEl("a2-income-int",incS.int);setEl("a2-income-dec",incS.dec);setEl("a2-expense-int",expS.int);setEl("a2-expense-dec",expS.dec);
+        var savAmt=document.getElementById("savings-panel-amt");if(savAmt)savAmt.textContent=sav.toFixed(2)+" "+dispSym;
+    }
+    renderList(mo);
+}
+/* ── renderAiSug/hideAiSug 已迁移至 src/ui/modals/input.js ── */
+
+function renderList(mo){
+    listSwipeOpenTi=null;
+    var list=document.getElementById("list");
+    var old=list.querySelectorAll(".tg,.sec,.list-edge-indicator");for(var i=0;i<old.length;i++)old[i].remove();
+    if(!mo.length){list.innerHTML='<div class="empty-mo">本月暂无记录<br>点右下 + 手动添加<br>或输入一句话</div>';return}
+    list.innerHTML="";
+    var sorted=[].concat(mo).sort(function(a,b){
+        if(new Date(a.ts).toDateString()===new Date(b.ts).toDateString()){
+            var aT=(a.timePrecision==="exact"||a.timePrecision==="daytime");
+            var bT=(b.timePrecision==="exact"||b.timePrecision==="daytime");
+            if(!aT&&bT)return-1;if(aT&&!bT)return 1
+        }return b.ts-a.ts
+    });
+    var groups={},order=[];sorted.forEach(function(t){var d=new Date(t.ts);var k=t.timePrecision==="month"?(d.getFullYear()+"-"+d.getMonth()):t.timePrecision==="year_only"?(d.getFullYear()+"y"):d.toDateString();var lbl=groupListLbl(t);if(!groups[k]){groups[k]={lbl:lbl,items:[]};order.push(k)}groups[k].items.push(t)});
+    order.forEach(function(k){var g=groups[k],sec=document.createElement("div");sec.className="sec";var rN=rate();var inSum=0,exSum=0;g.items.forEach(function(t){var vEur=t.currency==="CNY"?t.amount/rN:t.amount;if(t.type==="income")inSum+=vEur;else if(t.type==="expense")exSum+=vEur});var sumHtml="";if(inSum>0&&exSum>0){sumHtml='<span class="sec-sum">收 +'+inSum.toFixed(2)+'€  支 −'+exSum.toFixed(2)+'€</span>'}else if(inSum>0){sumHtml='<span class="sec-sum">收 +'+inSum.toFixed(2)+'€</span>'}else if(exSum>0){sumHtml='<span class="sec-sum">支 −'+exSum.toFixed(2)+'€</span>'}sec.innerHTML='<span class="sec-lbl">'+g.lbl+'</span>'+sumHtml;list.appendChild(sec);var card=document.createElement("div");card.className="tg";g.items.forEach(function(t,ri){var ico=getCatIcon(t.category)||CAT_ICO[t.category]||"📦";var div=document.createElement("div");div.className="ti";var idx=txs.indexOf(t);div.setAttribute("data-idx",idx);div.innerHTML='<button type="button" class="ti-delete-btn" aria-label="删除"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg></button><div class="ti-content"><div class="tic" data-role="cat">'+ico+'</div><div class="tin" data-role="desc"><div class="tid">'+t.desc+'</div>'+listTimBlockHtml(t)+'</div><div class="tia" data-role="amt">'+fmtA(t)+'</div><div class="ti-more" data-role="detail"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div></div>';bindListRowSwipe(div);card.appendChild(div)});list.appendChild(card)});
+    initListEdgeScroll(list);
+}
+
+// ── 列表边缘滑动切换月份 ──
+var _listEdgeState=null;
+function initListEdgeScroll(list){
+    // 【修复核心】：防止重复绑定事件导致一次滑动触发多次切换（解决月份乱跳）
+    if(list.dataset.edgeBound === 'true') return;
+    list.dataset.edgeBound = 'true';
+
+    var startY=0, currentY=0, isEdgeDrag=false, edgeDir=0;
+    var edgeTop=null, edgeBot=null;
+    var atTop=false, atBot=false;
+    
+    function ensureIndicators(){
+        if(!edgeTop){
+            edgeTop=document.createElement("div");
+            edgeTop.className="list-edge-indicator top";
+            edgeTop.textContent="▼ 下个月";
+            list.appendChild(edgeTop);
+        }
+        if(!edgeBot){
+            edgeBot=document.createElement("div");
+            edgeBot.className="list-edge-indicator bottom";
+            edgeBot.textContent="▲ 上个月";
+            list.appendChild(edgeBot);
+        }
+    }
+    
+    function removeIndicators(){
+        if(edgeTop){edgeTop.remove(); edgeTop=null;}
+        if(edgeBot){edgeBot.remove(); edgeBot=null;}
+    }
+    
+    function onTouchStart(e){
+        if(e.touches.length!==1)return;
+        atTop = list.scrollTop <= 1;
+        atBot = list.scrollTop + list.clientHeight >= list.scrollHeight - 1;
+        
+        if(!atTop && !atBot){
+            isEdgeDrag = false;
+            edgeDir = 0;
+            removeIndicators();
+            return;
+        }
+        
+        isEdgeDrag = true;
+        edgeDir = 0; 
+        startY = e.touches[0].clientY; 
+        currentY = startY;
+    }
+    
+    function onTouchMove(e){
+        if(!isEdgeDrag) return;
+        currentY = e.touches[0].clientY;
+        var dy = currentY - startY;
+        
+        if(edgeDir === 0){
+            if(Math.abs(dy) < 5) return;
+            if(dy > 0 && atTop) edgeDir = -1; // 向下划，触发顶部下拉
+            else if(dy < 0 && atBot) edgeDir = 1; // 向上划，触发底部上拉
+            else { isEdgeDrag = false; return; }
+            
+            ensureIndicators();
+            if(edgeDir === -1) edgeTop.classList.add("show");
+            else edgeBot.classList.add("show");
+        }
+        
+        // 越界回弹阻尼
+        if((edgeDir === -1 && dy < 0) || (edgeDir === 1 && dy > 0)){ dy *= 0.3; }
+        
+        var clamped = Math.max(-80, Math.min(80, Math.abs(dy))) * Math.sign(dy);
+        
+        // 保持水平居中
+        if(edgeDir === -1 && edgeTop){
+            edgeTop.style.transform = "translate(-50%, " + (clamped * 0.5) + "px)";
+            edgeTop.style.opacity = Math.min(1, Math.abs(clamped)/30);
+        }
+        else if(edgeDir === 1 && edgeBot){
+            edgeBot.style.transform = "translate(-50%, " + (clamped * 0.5) + "px)";
+            edgeBot.style.opacity = Math.min(1, Math.abs(clamped)/30);
+        }
+        
+        // 拖拽时屏蔽浏览器默认的橡皮筋回弹效果
+        if(Math.abs(dy) > 10 && e.cancelable) e.preventDefault();
+    }
+    
+    function onTouchEnd(e){
+        if(!isEdgeDrag) return;
+        isEdgeDrag = false;
+        if(edgeDir === 0) return;
+        
+        var finalY = e.changedTouches ? e.changedTouches[0].clientY : currentY;
+        var dy = finalY - startY;
+        
+        if(Math.abs(dy) > 40){
+            var step = 0;
+            if(edgeDir === -1 && dy > 0) step = 1;
+            else if(edgeDir === 1 && dy < 0) step = -1;
+            
+            if(step !== 0){
+                if(step === 1){
+                    var newMonth = viewMonth + 1;
+                    var newYear = viewYear;
+                    if(newMonth > 11){ newMonth = 0; newYear++; }
+                    var now = new Date();
+                    var realYear = now.getFullYear();
+                    var realMonth = now.getMonth();
+                    
+                    if(newYear > realYear || (newYear === realYear && newMonth > realMonth)){
+                        var hasFuture = txs.some(function(t){
+                            var d = new Date(t.ts);
+                            return d.getFullYear() === newYear && d.getMonth() === newMonth;
+                        });
+                        if(!hasFuture){
+                            if(typeof showToast === 'function') showToast('还没有未来记录');
+                            removeIndicators();
+                            return;
+                        }
+                    }
+                }
+                changeMonth(step);
+                if (typeof fxTab === 'function') fxTab();
+            }
+        }
+        removeIndicators();
+        edgeDir = 0;
+    }
+    
+    list.addEventListener("touchstart", onTouchStart, {passive: true});
+    list.addEventListener("touchmove", onTouchMove, {passive: false});
+    list.addEventListener("touchend", onTouchEnd);
+}
+
+// ── 滚轮时间选择器 ──
+class InfiniteWheel{
+    constructor(container,values,initialVal){
+        this.container=container;this.values=values;this.ITEM_HEIGHT=36;this.RADIUS=120;
+        this.offset=-(initialVal*this.ITEM_HEIGHT);this.velocity=0;this.isDragging=false;
+        this.DECAY=0.94;this.MIN_VELOCITY=0.02;this.MAX_VELOCITY=3;
+        this.lastY=0;this.lastTime=0;this.poolSize=values.length;
+        this.init();this.bind();this.loop();
+    }
+    init(){
+        this.inner=document.createElement("div");this.inner.className="wheel-inner";
+        this.items=[];
+        for(var i=-this.poolSize;i<this.poolSize*2;i++){
+            var el=document.createElement("div");el.className="wheel-item";this.inner.appendChild(el);this.items.push({el:el,index:i})
+        }
+        this.container.innerHTML="";this.container.appendChild(this.inner);
+        var line=document.createElement("div");line.className="wheel-center-line";this.container.appendChild(line);
+    }
+    normalize(i){var n=this.values.length;return((i%n)+n)%n}
+    getValue(){
+        var centerIndex=-this.offset/this.ITEM_HEIGHT;
+        var idx=Math.round(centerIndex);
+        return this.values[this.normalize(idx)];
+    }
+    bind(){
+        var self=this;
+        var start=function(e){self.isDragging=true;self.velocity=0;self.lastY=self.getY(e);self.lastTime=performance.now()};
+        var move=function(e){if(!self.isDragging)return;var y=self.getY(e);var now=performance.now();var dy=y-self.lastY;var dt=now-self.lastTime;self.offset+=dy;self.velocity=dy/dt;self.velocity=Math.max(-self.MAX_VELOCITY,Math.min(self.MAX_VELOCITY,self.velocity));self.lastY=y;self.lastTime=now};
+        var end=function(){self.isDragging=false};
+        this.container.addEventListener("mousedown",start);window.addEventListener("mousemove",move);window.addEventListener("mouseup",end);
+        this.container.addEventListener("touchstart",start,{passive:true});window.addEventListener("touchmove",move,{passive:false});window.addEventListener("touchend",end);
+    }
+    getY(e){return e.touches?e.touches[0].clientY:e.clientY}
+    physics(){if(!this.isDragging){if(Math.abs(this.velocity)>this.MIN_VELOCITY){this.offset+=this.velocity*16;this.velocity*=this.DECAY}else{this.velocity=0;this.snap()}}}
+    snap(){this.offset=Math.round(this.offset/this.ITEM_HEIGHT)*this.ITEM_HEIGHT}
+    loopOffset(){var totalHeight=this.values.length*this.ITEM_HEIGHT;if(this.offset>totalHeight)this.offset-=totalHeight;if(this.offset<-totalHeight)this.offset+=totalHeight}
+    render(){
+    var centerIndex=-this.offset/this.ITEM_HEIGHT;
+    var self=this;
+    this.items.forEach(function(item){
+        var logicalIndex=item.index+centerIndex;
+        var diff=logicalIndex-centerIndex;
+        var y=diff*self.ITEM_HEIGHT;
+        var value=self.normalize(Math.round(logicalIndex));
+        item.el.innerText=String(self.values[value]).padStart(2,"0");
+        item.el.style.transform="translateY("+y+"px)";
+        item.el.style.opacity=Math.max(0.35,1-Math.abs(diff)*0.12);
+    });
+}
+    loop(){this.physics();this.loopOffset();this.render();requestAnimationFrame(function(){this.loop()}.bind(this))}
+}
+
+var _wheelHoursInst=null,_wheelMinsInst=null;
+function initWheelTime(h,m){
+    _wheelHours=h;_wheelMins=m;
+    var hCont=document.getElementById("wheelHours");var mCont=document.getElementById("wheelMinutes");
+    if(_wheelHoursInst){_wheelHoursInst.container.innerHTML="";_wheelHoursInst=null}
+    if(_wheelMinsInst){_wheelMinsInst.container.innerHTML="";_wheelMinsInst=null}
+    if(hCont&&mCont){
+        _wheelHoursInst=new InfiniteWheel(hCont,Array.from({length:24},function(_,i){return i}),h);
+        _wheelMinsInst=new InfiniteWheel(mCont,Array.from({length:60},function(_,i){return i}),m);
+    }
+}
+function openWheelTimeForTx(idx){
+    var t=txs[idx];if(!t)return;
+    var d=new Date(t.ts);
+    openWheelTime(d.getHours(),d.getMinutes(),function(h,m){
+        var nd=new Date(t.ts);nd.setHours(h,m,0,0);
+        t.ts=nd.getTime();t.timePrecision="exact";t.timeLabel="";t.timePhrase=null;
+        saveTxs(txs);render();showToast("时间已更新 ✓");
+    });
+}
+function openWheelTime(h,m,cb){
+    _wheelCallback=cb;
+    initWheelTime(h,m);
+    document.getElementById("ov-wheel-time").style.display="flex";
+    fxOpen();
+}
+function closeWheelTime(save){
+    if(save&&_wheelHoursInst&&_wheelMinsInst&&_wheelCallback){
+        var h=_wheelHoursInst.getValue();var m=_wheelMinsInst.getValue();
+        _wheelCallback(h,m);
+    }
+    _wheelCallback=null;
+    document.getElementById("ov-wheel-time").style.display="none";
+    fxClose();
+}
+
+// ── 左滑删除（带阻尼+可变宽）──
+function closeOtherListSwipe(keep){if(!listSwipeOpenTi||listSwipeOpenTi===keep)return;var prev=listSwipeOpenTi;var c=prev.querySelector(".ti-content");if(c){c.style.transition="transform .45s cubic-bezier(0.25, 1, 0.5, 1)";c.style.transform="translateX(0)"}prev.classList.remove("is-open");prev.classList.remove("is-sliding");listSwipeOpenTi=null}
+function resetListSwipeAll(){closeOtherListSwipe(null)}
+function bindListRowSwipe(el){
+    var content=el.querySelector(".ti-content");var delBtn=el.querySelector(".ti-delete-btn");
+    var startX=0,startY=0,currentX=0;var isSliding=false;var isOpen=false;
+    el.addEventListener("touchstart",function(e){startX=e.touches[0].clientX;startY=e.touches[0].clientY;content.style.transition="none";isSliding=false},{passive:true});
+    el.addEventListener("touchmove",function(e){
+        var dX=e.touches[0].clientX-startX;var dY=e.touches[0].clientY-startY;
+        if(!isSliding&&Math.abs(dX)>15&&Math.abs(dX)>Math.abs(dY)){isSliding=true;el.classList.add("is-sliding");if(dX<0)closeOtherListSwipe(el)}
+        if(isSliding){
+            var baseMove=isOpen?dX-80:dX;
+            var raw=Math.min(0,Math.max(-SWIPE_DEL_MAX-40,baseMove));
+            if(raw<-80){var beyond=raw+80;raw=-80+beyond*0.25}
+            currentX=raw;
+            content.style.transform="translateX("+currentX+"px)";
+            var btnW=Math.max(60,Math.min(120,Math.abs(currentX)+20));
+            if(delBtn)delBtn.style.width=btnW+"px";
+            if(e.cancelable)e.preventDefault();
+        }
+    },{passive:false});
+    el.addEventListener("touchend",function(){
+        content.style.transition="transform 0.35s cubic-bezier(0.25, 1, 0.5, 1)";
+        el.classList.remove("is-sliding");
+        if(isSliding){
+            if(currentX<-40){content.style.transform="translateX(-80px)";el.classList.add("is-open");isOpen=true;listSwipeOpenTi=el;if(delBtn)delBtn.style.width="80px"}else{content.style.transform="translateX(0)";el.classList.remove("is-open");isOpen=false;if(listSwipeOpenTi===el)listSwipeOpenTi=null;if(delBtn)delBtn.style.width="80px"}
+            setTimeout(function(){isSliding=false},100);
+        }
+    });
+    content.onclick=function(e){
+        if(isSliding)return;
+        if(isOpen){content.style.transform="translateX(0)";el.classList.remove("is-open");isOpen=false;if(delBtn)delBtn.style.width="80px";return}
+        var idx=parseInt(el.getAttribute("data-idx"));
+        if(e.target.closest(".tic")){if(typeof openDetail==="function")openDetail(idx)}
+        else if(e.target.closest(".tid")){if(typeof inlineEditDesc==="function")inlineEditDesc(idx,el)}
+        else if(e.target.closest(".tia")){if(typeof inlineEditAmt==="function")inlineEditAmt(idx,el)}
+    };
+    delBtn.onclick=function(e){e.preventDefault();e.stopPropagation();var idx=el.getAttribute("data-idx");if(typeof confirmDelete==="function"){confirmDelete(parseInt(idx))}};
+}
+
+function confirmDelete(id){if(id<0||id>=txs.length)return;deleteConfirmIdx=id;var t=txs[id],sg=t.type==="expense"?"−":"+",sym=t.currency==="CNY"?"¥":"€";document.getElementById("deleteConfirmBody").innerHTML='<div class="scard"><div class="srow"><span class="sk">描述</span><span class="sv2">'+escTx(t.desc)+'</span></div><div class="srow"><span class="sk">金额</span><span class="sv2" style="color:'+amtC(t)+'">'+sg+t.amount.toFixed(2)+" "+sym+'</span></div></div>';document.getElementById("ov-delete-confirm").style.display="flex"}
+function resetDeleteConfirmRow(){if(deleteConfirmIdx<0)return;var el=document.querySelector('.ti[data-idx="'+deleteConfirmIdx+'"]');if(el){var c=el.querySelector(".ti-content");if(c){c.style.transition="transform .35s cubic-bezier(0.25, 1, 0.5, 1)";c.style.transform="translateX(0)"}}if(listSwipeOpenTi===el)listSwipeOpenTi=null}
+function cancelDeleteConfirm(){closeOv("ov-delete-confirm")}
+function executeDeleteConfirm(){var i=deleteConfirmIdx;if(i<0||i>=txs.length){closeOv("ov-delete-confirm");return}saveTxs(txs.filter(function(_,j){return j!==i}));listSwipeOpenTi=null;closeOv("ov-delete-confirm");render();showToast("已删除");if(currentTab==="analysis")renderAnalysis();if(currentTab==="search")doSearch()}
+
+var mType="expense",mCur="EUR",mCat="其他";var cOp=null,cPrev=null,cReset=false;
+var confirmYearOnly=false,confirmYear=0,confirmMonthSel=-1;var manualDraft=null;
+
+// ── F4: 类型分组默认类别 ──
+// L_FIX4: 三种类型的初始默认类别（手动记账面板会在末尾自动追加"设置"按钮）
+var DEFAULT_CATS_BY_TYPE={
+    expense:[{name:"吃",icon:"lucide:utensils"},{name:"买",icon:"lucide:shopping-bag"},{name:"车",icon:"lucide:car"},{name:"运动",icon:"lucide:dumbbell"},{name:"其他",icon:"lucide:package"}],
+    income:[{name:"工资",icon:"lucide:wallet"},{name:"现金",icon:"lucide:gift"},{name:"转账",icon:"lucide:ticket"},{name:"其他",icon:"lucide:package"}],
+    savings:[{name:"储蓄",icon:"lucide:piggy-bank"},{name:"股票",icon:"lucide:gem"},{name:"资产",icon:"lucide:star"},{name:"其他",icon:"lucide:package"}]
+};
+var customCategoriesByType={expense:[],income:[],savings:[]};
+var customCategories=[];
+// L_FIX4: 一旦默认分类版本变更，强制把旧用户的 localStorage 升级到新默认
+var CAT_DEFAULTS_VERSION="2026-04-28-v2"; // 吃/买/车/运动/其他 + 工资/现金/转账/其他 + 储蓄/股票/资产/其他
+function loadCustomCategories(){
+    var savedVer=null;try{savedVer=localStorage.getItem("customCategoriesVersion");}catch(e){}
+    if(savedVer!==CAT_DEFAULTS_VERSION){
+        // 版本不一致 → 强制重置为新默认（迁移老数据到新分类组）
+        customCategoriesByType.expense=DEFAULT_CATS_BY_TYPE.expense.slice();
+        customCategoriesByType.income=DEFAULT_CATS_BY_TYPE.income.slice();
+        customCategoriesByType.savings=DEFAULT_CATS_BY_TYPE.savings.slice();
+        customCategories=customCategoriesByType.expense;
+        try{localStorage.setItem("customCategoriesByType",JSON.stringify(customCategoriesByType));localStorage.setItem("customCategoriesVersion",CAT_DEFAULTS_VERSION);}catch(e){}
+        return;
+    }
+    try{var s=localStorage.getItem("customCategoriesByType");if(s){var o=JSON.parse(s);if(o&&typeof o==="object"){["expense","income","savings"].forEach(function(k){customCategoriesByType[k]=Array.isArray(o[k])&&o[k].length?o[k]:DEFAULT_CATS_BY_TYPE[k].slice()});customCategories=customCategoriesByType.expense;return}}}catch(e){}
+    customCategoriesByType.expense=DEFAULT_CATS_BY_TYPE.expense.slice();customCategoriesByType.income=DEFAULT_CATS_BY_TYPE.income.slice();customCategoriesByType.savings=DEFAULT_CATS_BY_TYPE.savings.slice();customCategories=customCategoriesByType.expense;
+}
+function saveCustomCategories(){try{localStorage.setItem("customCategoriesByType",JSON.stringify(customCategoriesByType))}catch(e){}}
+function getCatIcon(name){var lists=[customCategoriesByType.expense,customCategoriesByType.income,customCategoriesByType.savings];for(var L=0;L<lists.length;L++){var arr=lists[L];if(!arr)continue;for(var i=0;i<arr.length;i++){if(arr[i].name===name)return renderIconValue(arr[i].icon,22,1.6)}}return CAT_ICO[name]||"📦"}
+function getActiveCustomCats(){var k=mType||"expense";return customCategoriesByType[k]||[]}
+function getCatsByType(type){var t=type||"expense";var arr=customCategoriesByType[t]||[];return arr.length?arr:DEFAULT_CATS_BY_TYPE[t].slice()}
+
+function selTypeTab(el){fxTab();document.querySelectorAll("#manualTypeTabs .manual-type-tab").forEach(function(t){t.classList.remove("active")});el.classList.add("active");mType=el.getAttribute("data-v");document.querySelectorAll("#typebtns .seg-btn").forEach(function(b){b.classList.toggle("sel",b.getAttribute("data-v")===mType)});customCategories=getActiveCustomCats();if(customCategories.length&&!customCategories.some(function(c){return c.name===mCat})){mCat=customCategories[0].name}buildManualCatRow()}
+function syncTypeTabs(){document.querySelectorAll("#manualTypeTabs .manual-type-tab").forEach(function(t){t.classList.toggle("active",t.getAttribute("data-v")===mType)})}
+function selCurPill(el){fxTap();document.querySelectorAll("#manualCurRow .manual-cur-pill").forEach(function(p){p.classList.remove("active")});el.classList.add("active");mCur=el.getAttribute("data-v");var sym=mCur==="CNY"?"¥":"€";var s1=document.getElementById("amtSym");if(s1)s1.textContent=sym;var s2=document.getElementById("mcAmtSym");if(s2)s2.textContent=sym;document.querySelectorAll("#curbtns .seg-btn").forEach(function(b){b.classList.toggle("sel",b.getAttribute("data-v")===mCur)})}
+function syncCurPills(){document.querySelectorAll("#manualCurRow .manual-cur-pill").forEach(function(p){p.classList.toggle("active",p.getAttribute("data-v")===mCur)})}
+var GEAR_SVG='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
+
+function buildManualCatRow(){
+    var row=document.getElementById("manualCatRow");if(!row)return;row.innerHTML="";
+    customCategories=getActiveCustomCats();
+    if(!customCategories.some(function(c){return c.name===mCat})&&customCategories.length){mCat=customCategories[0].name}
+    customCategories.forEach(function(c){
+        var item=document.createElement("div");item.className="manual-cat-item"+(c.name===mCat?" active":"");item.setAttribute("data-c",c.name);
+        item.innerHTML='<div class="mci-dot">'+renderIconValue(c.icon,22,1.6)+'</div><div class="mci-lbl">'+c.name+'</div>';
+        item.onclick=(function(n){return function(){selManualCat(n)}})(c.name);row.appendChild(item);
+    });
+    var gear=document.createElement("div");gear.className="manual-cat-item";gear.innerHTML='<div class="mci-dot">'+GEAR_SVG+'</div><div class="mci-lbl">设置</div>';gear.onclick=openCatSettings;row.appendChild(gear);
+}
+function selManualCat(name){fxTap();mCat=name;syncManualCatRow();document.querySelectorAll("#catgrid .cat-btn").forEach(function(b){b.classList.toggle("sel",b.getAttribute("data-c")===mCat)})}
+function syncManualCatRow(){var row=document.getElementById("manualCatRow");if(!row)return;var items=row.querySelectorAll(".manual-cat-item[data-c]");var found=false;items.forEach(function(it){var sel=it.getAttribute("data-c")===mCat;it.classList.toggle("active",sel);if(sel)found=true});if(!found)buildManualCatRow()}
+
+function openCatSettings(){renderCatSettings();document.getElementById("ov-catsettings").style.display="flex"}
+function closeCatSettings(){document.getElementById("ov-catsettings").style.display="none";saveCustomCategories();buildManualCatRow()}
+function renderCatSettings(){
+    var list=document.getElementById("catSettingsList");list.innerHTML="";
+    customCategories.forEach(function(c,i){
+        var r=document.createElement("div");r.className="cs-row";r.setAttribute("data-i",i);r.setAttribute("draggable","true");
+        var ico=document.createElement("div");ico.className="cs-ico";ico.innerHTML=renderIconValue(c.icon,22,1.6);ico.title="点击修改图标";ico.onclick=function(){editCatIcon(i)};
+        var nm=document.createElement("input");nm.className="cs-name";nm.value=c.name;nm.placeholder="类别名";nm.oninput=function(){customCategories[i].name=nm.value};nm.onblur=function(){if(!nm.value.trim())nm.value=customCategories[i].name="新类别";saveCustomCategories()};
+        var del=document.createElement("span");del.className="cs-del";del.textContent="删除";del.onclick=function(){deleteCat(i)};
+        var drag=document.createElement("span");drag.className="cs-drag";drag.textContent="⋮⋮";drag.title="拖动排序";
+        r.appendChild(ico);r.appendChild(nm);if(customCategories.length>1)r.appendChild(del);r.appendChild(drag);
+        r.addEventListener("dragstart",function(e){r.classList.add("dragging");e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",String(i))});
+        r.addEventListener("dragend",function(){r.classList.remove("dragging")});r.addEventListener("dragover",function(e){e.preventDefault();e.dataTransfer.dropEffect="move"});
+        r.addEventListener("drop",function(e){e.preventDefault();var from=parseInt(e.dataTransfer.getData("text/plain"),10);var to=i;if(isNaN(from)||from===to)return;var moved=customCategories.splice(from,1)[0];customCategories.splice(to,0,moved);saveCustomCategories();renderCatSettings()});
+        var dragStartY=null,dragStartIdx=null;
+        drag.addEventListener("touchstart",function(e){dragStartY=e.touches[0].clientY;dragStartIdx=i;r.classList.add("dragging")},{passive:true});
+        drag.addEventListener("touchmove",function(e){if(dragStartY===null)return;var y=e.touches[0].clientY;var els=document.querySelectorAll("#catSettingsList .cs-row");for(var k=0;k<els.length;k++){var rect=els[k].getBoundingClientRect();if(y>=rect.top&&y<=rect.bottom){var ki=parseInt(els[k].getAttribute("data-i"),10);if(ki!==dragStartIdx){var moved=customCategories.splice(dragStartIdx,1)[0];customCategories.splice(ki,0,moved);dragStartIdx=ki;saveCustomCategories();renderCatSettings();return}}}e.preventDefault()},{passive:false});
+        drag.addEventListener("touchend",function(){r.classList.remove("dragging");dragStartY=null;dragStartIdx=null});
+        list.appendChild(r);
+    });
+}
+var LUCIDE_PICKER_LIST=["utensils","coffee","shopping-bag","store","gamepad-2","film","music","camera","car","plane","bus","home","heart-pulse","heart","dumbbell","wallet","piggy-bank","ticket","gift","gem","flame","star","sun","moon","book","book-open","briefcase","smile","package","target"];
+function editCatIcon(i){openLucidePicker(function(name){customCategories[i].icon="lucide:"+name;saveCustomCategories();renderCatSettings()},function(){var cur=customCategories[i].icon;var v=prompt("输入图标 emoji（例：🍔🛒🎯）:",typeof cur==="string"&&cur.indexOf("lucide:")<0&&cur.indexOf("<svg")<0?cur:"📦");if(v===null)return;v=v.trim();if(v){customCategories[i].icon=v;saveCustomCategories();renderCatSettings()}})}
+function openLucidePicker(onPick,onEmoji){var ov=document.getElementById("ov-lucide-picker");if(!ov)return;var grid=document.getElementById("lucide-picker-grid");grid.innerHTML="";LUCIDE_PICKER_LIST.forEach(function(n){var c=document.createElement("div");c.className="lp-cell";c.innerHTML=lucideSvg(n,24,1.6);c.title=n;c.onclick=function(){closeLucidePicker();onPick(n)};grid.appendChild(c)});document.getElementById("lp-emoji-btn").onclick=function(){closeLucidePicker();if(onEmoji)onEmoji()};ov.style.display="flex"}
+function closeLucidePicker(){var ov=document.getElementById("ov-lucide-picker");if(ov)ov.style.display="none"}
+function deleteCat(i){if(customCategories.length<=1){showToast("至少保留 1 个类别");return}if(!confirm("删除类别 \""+customCategories[i].name+"\"？已记录的交易不受影响。"))return;customCategories.splice(i,1);saveCustomCategories();renderCatSettings()}
+function addNewCat(){customCategories.push({name:"新类别",icon:"📦"});saveCustomCategories();renderCatSettings();var list=document.getElementById("catSettingsList");setTimeout(function(){list.scrollTop=list.scrollHeight},30)}
+
+var mcAmt="",mcHasDot=false,mcDecCount=0,mcOp=null,mcPrev=null,mcDate=null;
+function mcReset(){mcAmt="";mcHasDot=false;mcDecCount=0;mcOp=null;mcPrev=null;mcDate=null;updateMcDisplay();updateMcDateBtn()}
+function mcSetFromAmount(amt){mcOp=null;mcPrev=null;if(!amt||amt<=0){mcAmt="";mcHasDot=false;mcDecCount=0}else{var s=String(amt);if(s.indexOf(".")>=0){s=s.replace(/0+$/,"").replace(/\.$/,"")}mcAmt=s;mcHasDot=s.indexOf(".")>=0;mcDecCount=mcHasDot?s.split(".")[1].length:0}updateMcDisplay()}
+function updateMcDisplay(){var val=document.getElementById("mcAmtVal");if(!val)return;var expr=document.getElementById("mcAmtExpr");var showVal;if(mcOp&&mcPrev!==null&&mcAmt!=""){showVal=String(mcDoOp(mcPrev,mcAmt,mcOp))}else if(mcOp&&mcPrev!==null&&mcAmt==""){showVal=mcPrev}else{showVal=(mcAmt!=""?mcAmt:"0")}val.textContent=showVal;if(mcOp&&mcPrev!==null)expr.textContent=mcPrev+" "+(mcOp==="-"? "−":mcOp)+" "+(mcAmt||"");else expr.textContent="";var hidden=document.getElementById("mamt");if(hidden){hidden.value=showVal}}
+function updateMcDateBtn(){var lbl=document.getElementById("mcDateLbl");if(!lbl)return;if(mcDate){var d=new Date(mcDate);lbl.textContent=d.getFullYear()+"年"+(d.getMonth()+1)+"月"+d.getDate()+"日"}else{lbl.textContent="今天"}}
+function mcDoOp(a,b,op){var x=parseFloat(a)||0,y=parseFloat(b)||0;var r=op==="+"?x+y:x-y;return parseFloat(r.toFixed(2))}
+function mcInput(k){if(/^[0-9]$/.test(k)){if(mcHasDot&&mcDecCount>=2){fxError();return}if(mcHasDot)mcDecCount++;if(mcAmt==""||mcAmt=="0"){if(!mcHasDot)mcAmt=k;else mcAmt+=k}else mcAmt+=k;fxTap()}else if(k==="."){if(mcHasDot){fxError();return}if(mcAmt=="")mcAmt="0";mcAmt+=".";mcHasDot=true;fxTapAlt()}else if(k==="B"){if(mcAmt.length>0){var removed=mcAmt.charAt(mcAmt.length-1);mcAmt=mcAmt.slice(0,-1);if(removed===".")mcHasDot=false;else if(mcHasDot&&mcDecCount>0)mcDecCount--;fxTapAlt()}else if(mcOp){mcAmt=mcPrev||"";mcOp=null;mcPrev=null;mcHasDot=mcAmt.indexOf(".")>=0;mcDecCount=mcHasDot?mcAmt.split(".")[1].length:0;fxTapAlt()}}else if(k==="+"||k==="-"){if(mcAmt==""&&mcPrev===null){fxError();return}if(mcAmt!=""){if(mcOp&&mcPrev!==null){mcPrev=String(mcDoOp(mcPrev,mcAmt,mcOp))}else{mcPrev=mcAmt}mcAmt="";mcHasDot=false;mcDecCount=0}mcOp=k;fxTapAlt()}updateMcDisplay()}
+function mcDone(){var finalAmt;if(mcOp&&mcPrev!==null){finalAmt=mcAmt!=""?mcDoOp(mcPrev,mcAmt,mcOp):parseFloat(mcPrev)}else{finalAmt=parseFloat(mcAmt||"0")}if(!finalAmt||finalAmt<=0){fxError();showToast("请输入金额");return}fxSuccess();document.getElementById("mamt").value=finalAmt;document.getElementById("mdesc").value=document.getElementById("mcDescInp").value||"";if(mcDate){var d=new Date(mcDate);document.getElementById("mdate").value=d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}else{var d2=new Date();document.getElementById("mdate").value=d2.getFullYear()+"-"+pad(d2.getMonth()+1)+"-"+pad(d2.getDate())}submitManual()}
+function mcDateChange(v){if(!v){mcDate=null}else{mcDate=new Date(v+"T12:00:00").getTime()}updateMcDateBtn()}
+
+function saveDraft(){manualDraft={type:mType,cur:mCur,cat:mCat,desc:(document.getElementById("mcDescInp")||document.getElementById("mdesc")).value,amt:document.getElementById("mamt").value,date:document.getElementById("mdate").value,editIdx:editIdx,mcAmt:mcAmt,mcHasDot:mcHasDot,mcDecCount:mcDecCount,mcOp:mcOp,mcPrev:mcPrev,mcDate:mcDate}}
+function restoreDraft(){if(!manualDraft||manualDraft.editIdx!==editIdx)return;mType=manualDraft.type;mCur=manualDraft.cur;mCat=manualDraft.cat;document.querySelectorAll("#typebtns .seg-btn").forEach(function(b){b.classList.toggle("sel",b.getAttribute("data-v")===mType)});document.querySelectorAll("#curbtns .seg-btn").forEach(function(b){b.classList.toggle("sel",b.getAttribute("data-v")===mCur)});document.getElementById("amtSym").textContent=mCur==="CNY"?"¥":"€";var di=document.getElementById("mcDescInp");if(di)di.value=manualDraft.desc||"";document.getElementById("mdesc").value=manualDraft.desc||"";document.getElementById("mamt").value=manualDraft.amt;document.getElementById("mdate").value=manualDraft.date;mcAmt=manualDraft.mcAmt||"";mcHasDot=!!manualDraft.mcHasDot;mcDecCount=manualDraft.mcDecCount||0;mcOp=manualDraft.mcOp||null;mcPrev=manualDraft.mcPrev||null;mcDate=manualDraft.mcDate||null;syncTypeTabs();syncCurPills();var sym=document.getElementById("mcAmtSym");if(sym)sym.textContent=mCur==="CNY"?"¥":"€";buildCatGrid();buildManualCatRow();updateMcDisplay();updateMcDateBtn();manualDraft=null}
+function swipeCloseManual(){saveDraft();closeOv("ov-manual")}
+function clearAndCloseManual(){fxClose();manualDraft=null;mcReset();mcDate=null;updateMcDateBtn();updateMcDisplay();var di=document.getElementById("mcDescInp");if(di)di.value="";var ai=document.getElementById("mamt");if(ai)ai.value="";var dd=document.getElementById("mdate");if(dd)dd.value="";var md=document.getElementById("mdesc");if(md)md.value="";closeOv("ov-manual")}
+function openManual(idx){fxOpen();editIdx=idx;var isEdit=idx>=0&&idx<txs.length;document.getElementById("manual-title").textContent=isEdit?"编辑记录":"手动记账";var t=isEdit?txs[idx]:null;mType=t?t.type:"expense";mCur=t?t.currency:(settings.defaultCurrency||"EUR");mCat=t?t.category:(customCategories[0]?customCategories[0].name:"其他");document.querySelectorAll("#typebtns .seg-btn").forEach(function(b){b.classList.toggle("sel",b.getAttribute("data-v")===mType)});document.querySelectorAll("#curbtns .seg-btn").forEach(function(b){b.classList.toggle("sel",b.getAttribute("data-v")===mCur)});document.getElementById("amtSym").textContent=mCur==="CNY"?"¥":"€";document.getElementById("mdesc").value=t?t.desc:"";document.getElementById("mamt").value=t?t.amount:"";cOp=null;cPrev=null;cReset=false;document.getElementById("calcExpr").textContent="";var dateD=t?new Date(t.ts):new Date();document.getElementById("mdate").value=dateD.getFullYear()+"-"+pad(dateD.getMonth()+1)+"-"+pad(dateD.getDate());buildCatGrid();syncTypeTabs();syncCurPills();var sym=document.getElementById("mcAmtSym");if(sym)sym.textContent=mCur==="CNY"?"¥":"€";var di=document.getElementById("mcDescInp");if(di)di.value=t?t.desc:"";mcOp=null;mcPrev=null;mcDate=isEdit?t.ts:null;if(t&&t.amount){mcSetFromAmount(t.amount)}else{mcAmt="";mcHasDot=false;mcDecCount=0;updateMcDisplay()}updateMcDateBtn();var dInp=document.getElementById("mcDateInp");if(dInp){dInp.value=document.getElementById("mdate").value}buildManualCatRow();document.getElementById("manualSugRow").innerHTML="";var sugR=document.getElementById("mcSugRow");if(sugR)sugR.innerHTML="";document.getElementById("ov-manual").style.display="flex";if(!isEdit&&manualDraft&&manualDraft.editIdx===-1)restoreDraft()}
+function submitManual(){var amt=parseFloat(document.getElementById("mamt").value);if(!amt||amt<=0){showToast("请输入有效金额");return}var descRaw=document.getElementById("mcDescInp")?document.getElementById("mcDescInp").value:document.getElementById("mdesc").value;var desc=(descRaw||"").trim()||mCat;var dateVal=document.getElementById("mdate").value;var ts=dateVal?new Date(dateVal+"T12:00:00").getTime():Date.now();var t={amount:amt,currency:mCur,category:mCat,type:mType,desc:desc,ts:ts,timeLabel:"",timePrecision:"day"};var next=editIdx>=0&&editIdx<txs.length?txs.slice():txs.concat([t]);if(editIdx>=0&&editIdx<txs.length)next[editIdx]=t;var d=new Date(ts);viewYear=d.getFullYear();viewMonth=d.getMonth();saveTxs(next);render();closeOv("ov-manual");manualDraft=null;showToast(editIdx>=0?"已更新 ✓":"已记录 ✓");if(currentTab==="analysis")renderAnalysis()}
+
+function openDetail(idx){resetListSwipeAll();if(idx<0||idx>=txs.length)return;detailIdx=idx;renderDetailBody();document.getElementById("ov-detail").style.display="flex"}
+function renderDetailBody(){
+    var t=txs[detailIdx];if(!t)return;var ico=getCatIcon(t.category)||CAT_ICO[t.category]||"📦";var sg=t.type==="expense"?"−":"+",sym=t.currency==="CNY"?"¥":"€";
+    document.getElementById("detailBody").innerHTML='<div style="font-size:34px;font-weight:700;text-align:center;letter-spacing:-2px;margin-bottom:14px;color:var(--t1)">'+sg+t.amount.toFixed(2)+' '+sym+'</div><div class="scard"><div class="srow"><span class="sk">备注</span><span class="sv2">'+escTx(t.desc)+'</span></div><div class="srow srow-edit" onclick="detailEditCat()"><span class="sk">类别</span><span class="sv2" style="display:inline-flex;align-items:center;gap:6px"><span class="dt-cat-ico">'+ico+'</span><span id="dt-cat-disp">'+t.category+'</span></span></div><div id="dt-cat-grid-wrap" style="display:none;background:var(--card);padding:10px 12px"><div class="conf-cat-wrap" id="dt-cat-grid"></div></div><div class="srow srow-edit" onclick="detailEditType()"><span class="sk">类型</span><span class="sv2" id="dt-type-disp">'+typeL(t.type)+'</span></div><div class="srow srow-edit" onclick="detailEditCur()"><span class="sk">货币</span><span class="sv2" id="dt-cur-disp">'+(t.currency==="CNY"?"人民币 ¥":"欧元 €")+'</span></div><div class="srow"><span class="sk">时间</span><span class="sv2">'+fmtFull(t)+'</span></div></div>';
+}
+function detailEditCat(){var t=txs[detailIdx];if(!t)return;var wrap=document.getElementById("dt-cat-grid-wrap");if(!wrap)return;if(wrap.style.display!=="none"){wrap.style.display="none";return}var grid=document.getElementById("dt-cat-grid");grid.innerHTML="";var typed=getCatsByType(t.type);typed.forEach(function(c){var btn=document.createElement("div");btn.className="conf-cat-btn"+(c.name===t.category?" sel":"");btn.innerHTML='<div style="font-size:16px">'+renderIconValue(c.icon,18,1.6)+'</div><div>'+c.name+'</div>';btn.onclick=function(){t.category=c.name;saveTxs(txs);render();renderDetailBody()};grid.appendChild(btn)});wrap.style.display="block"}
+function detailEditType(){
+    // L_FIX4: 切换类型时同步校正类别（如果当前类别不在新类型的列表里，回退到该类型默认第 1 项）
+    var t=txs[detailIdx];if(!t)return;fxTap();
+    var order=["expense","income","savings"];var i=order.indexOf(t.type);t.type=order[(i+1)%3];
+    var typed=getCatsByType(t.type);
+    if(typed.length&&!typed.some(function(c){return c.name===t.category})){t.category=typed[0].name;}
+    saveTxs(txs);render();renderDetailBody();
+}
+function detailEditCur(){var t=txs[detailIdx];if(!t)return;fxTap();t.currency=t.currency==="CNY"?"EUR":"CNY";saveTxs(txs);render();renderDetailBody()}
+
+function inlineEditDesc(idx,rowEl){var t=txs[idx];if(!t)return;var tidEl=rowEl.querySelector(".tid");if(!tidEl)return;if(tidEl._editing)return;tidEl._editing=true;fxOpen();tidEl.classList.add("editing-hl");var origText=t.desc;var inp=document.createElement("input");inp.type="text";inp.value=origText;inp.style.cssText="background:transparent;border:0;outline:none;color:var(--t1);font-size:16px;width:100%;font-family:inherit;padding:0;transform:scale(0.8125);transform-origin:left center;line-height:1";tidEl.innerHTML="";tidEl.appendChild(inp);var sugBar=document.createElement("div");sugBar.className="inline-sug-bar";sugBar.style.cssText="position:absolute;left:0;right:0;bottom:100%;background:var(--card);border:1px solid var(--bdr);border-radius:8px;padding:6px;display:flex;gap:6px;flex-wrap:wrap;max-width:90vw;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.15);margin-bottom:4px";function refreshSug(){sugBar.innerHTML="";var top=getTopDescs(8,origText).filter(function(d){return!inp.value||d.toLowerCase().indexOf(inp.value.toLowerCase())>=0});if(!top.length){sugBar.style.display="none";return}sugBar.style.display="flex";top.forEach(function(d){var ch=document.createElement("span");ch.textContent=d;ch.style.cssText="background:var(--bdr2);color:var(--t1);font-size:11px;padding:4px 8px;border-radius:10px;cursor:pointer";ch.onmousedown=function(e){e.preventDefault();inp.value=d;refreshSug()};ch.ontouchend=function(e){e.preventDefault();inp.value=d;refreshSug()};sugBar.appendChild(ch)})}var wrap=document.createElement("div");wrap.style.cssText="position:relative";tidEl.parentNode.insertBefore(wrap,tidEl);wrap.appendChild(sugBar);wrap.appendChild(tidEl);refreshSug();inp.oninput=refreshSug;inp.focus();inp.select();function commit(save){if(save){var v=inp.value.trim();if(v&&v!==origText){t.desc=v;saveTxs(txs)}}tidEl._editing=false;tidEl.classList.remove("editing-hl");if(wrap.parentNode){wrap.parentNode.insertBefore(tidEl,wrap);wrap.remove()}render()}inp.addEventListener("blur",function(){setTimeout(function(){commit(true)},150)});inp.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();inp.blur()}else if(e.key==="Escape"){commit(false)}})}
+
+var _iaIdx=-1,_iaAmt="",_iaHasDot=false,_iaDecCount=0,_iaOp=null,_iaPrev=null,_iaDate=null,_iaTia=null,_iaFloat=null;
+function inlineEditAmt(idx,rowEl){var t=txs[idx];if(!t)return;_iaIdx=idx;_iaTia=rowEl.querySelector(".tia");if(_iaTia){_iaTia.classList.add("editing-hl");var rect=_iaTia.getBoundingClientRect();_iaFloat=document.createElement("div");_iaFloat.className="tia-floating";_iaFloat.style.left=(rect.left-6)+"px";_iaFloat.style.top=(rect.top-3)+"px";_iaFloat.style.minWidth=rect.width+"px";_iaFloat.textContent=_iaTia.textContent;document.body.appendChild(_iaFloat)}_iaSetFromAmount(t.amount);_iaDate=t.ts;_iaUpdateDisp();_iaUpdateDateBtn();var sym=t.currency==="CNY"?"¥":"€";var sx=document.getElementById("iAmtSym");if(sx)sx.textContent=sym;var di=document.getElementById("iaDateInp");if(di){var d=new Date(_iaDate);di.value=d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}fxOpen();document.getElementById("ov-iamt").style.display="flex"}
+function closeIamt(save){if(save){var t=txs[_iaIdx];if(t){var fa;if(_iaOp&&_iaPrev!==null){fa=_iaAmt!=""?_iaDoOp(_iaPrev,_iaAmt,_iaOp):parseFloat(_iaPrev)}else{fa=parseFloat(_iaAmt||"0")}if(!fa||fa<=0){fxError();showToast("请输入金额");return}t.amount=parseFloat(fa.toFixed(2));if(_iaDate)t.ts=_iaDate;saveTxs(txs);fxSuccess()}}else{fxClose()}if(_iaTia){_iaTia.classList.remove("editing-hl")}if(_iaFloat&&_iaFloat.parentNode){_iaFloat.parentNode.removeChild(_iaFloat)}_iaTia=null;_iaFloat=null;_iaIdx=-1;document.getElementById("ov-iamt").style.display="none";render()}
+function _iaSetFromAmount(amt){_iaAmt=String(amt||"");if(!_iaAmt||_iaAmt==="0"||_iaAmt==="0.0"||_iaAmt==="0.00"){_iaAmt="";_iaHasDot=false;_iaDecCount=0}else{_iaHasDot=_iaAmt.indexOf(".")>=0;_iaDecCount=_iaHasDot?_iaAmt.split(".")[1].length:0}_iaOp=null;_iaPrev=null}
+function _iaDoOp(a,b,op){var x=parseFloat(a)||0,y=parseFloat(b)||0;var r=op==="+"?x+y:x-y;return parseFloat(r.toFixed(2))}
+function iaInput(k){if(/^[0-9]$/.test(k)){if(_iaHasDot&&_iaDecCount>=2){fxError();return}if(_iaHasDot)_iaDecCount++;if(_iaAmt==""||_iaAmt=="0"){if(!_iaHasDot)_iaAmt=k;else _iaAmt+=k}else _iaAmt+=k;fxTap()}else if(k==="."){if(_iaHasDot){fxError();return}if(_iaAmt=="")_iaAmt="0";_iaAmt+=".";_iaHasDot=true;fxTapAlt()}else if(k==="B"){if(_iaAmt.length>0){var rem=_iaAmt.charAt(_iaAmt.length-1);_iaAmt=_iaAmt.slice(0,-1);if(rem===".")_iaHasDot=false;else if(_iaHasDot&&_iaDecCount>0)_iaDecCount--;fxTapAlt()}else if(_iaOp){_iaAmt=_iaPrev||"";_iaOp=null;_iaPrev=null;_iaHasDot=_iaAmt.indexOf(".")>=0;_iaDecCount=_iaHasDot?_iaAmt.split(".")[1].length:0;fxTapAlt()}}else if(k==="+"||k==="-"){if(_iaAmt==""&&_iaPrev===null){fxError();return}if(_iaAmt!=""){if(_iaOp&&_iaPrev!==null){_iaPrev=String(_iaDoOp(_iaPrev,_iaAmt,_iaOp))}else{_iaPrev=_iaAmt}_iaAmt="";_iaHasDot=false;_iaDecCount=0}_iaOp=k;fxTapAlt()}_iaUpdateDisp()}
+function _iaUpdateDisp(){if(!_iaFloat)return;var t=txs[_iaIdx];if(!t)return;var sym=t.currency==="CNY"?"¥":"€",sg=t.type==="expense"?"−":"+";var show;if(_iaOp&&_iaPrev!==null&&_iaAmt!=""){show=String(_iaDoOp(_iaPrev,_iaAmt,_iaOp))}else if(_iaOp&&_iaPrev!==null&&_iaAmt==""){show=_iaPrev}else{show=(_iaAmt!=""?_iaAmt:"0")}var num=parseFloat(show)||0;var expr="";if(_iaOp&&_iaPrev!==null)expr=_iaPrev+" "+(_iaOp==="-"? "−":_iaOp)+" "+(_iaAmt||"");_iaFloat.innerHTML=(expr?'<span style="font-size:9px;color:var(--t3);margin-right:4px;font-weight:400">'+expr+'</span>':'')+sg+num.toFixed(2)+" "+sym}
+function iaDateChange(v){if(!v){_iaDate=null}else{_iaDate=new Date(v+"T12:00:00").getTime()}_iaUpdateDateBtn()}
+function _iaUpdateDateBtn(){var lbl=document.getElementById("iaDateLbl");if(!lbl)return;if(_iaDate){var d=new Date(_iaDate);lbl.textContent=d.getFullYear()+"年"+(d.getMonth()+1)+"月"+d.getDate()+"日"}else lbl.textContent="今天"}
+function doEdit(){var idx=detailIdx;closeOv("ov-detail");openManual(idx)}
+function doDelete(){if(detailIdx<0)return;var idx=detailIdx;closeOv("ov-detail");fxOpen();setTimeout(function(){confirmDelete(idx)},120)}
+
+function openInputSheet(){fxOpen();document.getElementById("ov-input").style.display="flex";setTimeout(function(){document.getElementById("field").focus()},120)}
+var _pendingNeedAmt=null,_pendingAfterCur=null;
+function doSend(){var text=document.getElementById("field").value.trim();if(!text)return;document.getElementById("field").value="";var results=parseVoiceText(text,settings.defaultCurrency||"EUR");var valid=results.filter(function(r){return r.ok});var needAmt=results.filter(function(r){return r.needAmountInput});var needCur=results.filter(function(r){return r.needCurrencyConfirm});if(needCur.length){_pendingAfterCur={valid:valid,needAmt:needAmt};var desc=needCur.map(function(r){return r.desc}).join("、");document.getElementById("cur-modal-sub").textContent="「"+desc.slice(0,20)+"」同时含两种货币，请选择";document.getElementById("cur-modal").style.display="flex";return}_doSendFinish(valid,needAmt)}
+function chooseCurrency(cur){document.getElementById("cur-modal").style.display="none";if(_pendingAfterCur){var v=_pendingAfterCur.valid,n=_pendingAfterCur.needAmt;v.concat(n).forEach(function(r){if(r.needCurrencyConfirm)r.currency=cur});_pendingAfterCur=null;_doSendFinish(v,n)}}
+function _doSendFinish(valid,needAmt){if(!valid.length&&needAmt.length){_pendingNeedAmt=needAmt[0];showAmtPrompt(needAmt[0]);return}if(!valid.length){showErr("没能识别金额，请说明花了多少钱");return}pending=valid;confirmYearOnly=false;confirmYear=0;confirmMonthSel=-1;document.getElementById("ov-input").style.display="none";showConfirm()}
+/* ── 确认弹窗已迁移至 src/ui/modals/confirm.js ── */
+
+/* ── 分析页已迁移至 src/ui/tabs/analysis.js ── */
+
+/* ── 搜索页 doSearch 已迁移至 src/ui/modals/search.js ── */
+
+/* ── 目标页已迁移至 src/ui/tabs/goals.js ── */
+
+/* ── 设置页核心已迁移至 src/ui/tabs/settings.js ── */
+var _cppCurVar=null,_cppCurHue=0,_cppCurLit=50;
+function openColorPicker(varName,anchor){fxOpen();_cppCurVar=varName;var cur=getEffectiveColor(varName);var hsl=hexToHsl(cur);_cppCurHue=hsl.h;_cppCurLit=hsl.l;var p=document.getElementById("colorPickerPanel");if(!p)return;var lbl=ADV_COLOR_KEYS.filter(function(k){return k.varName===varName})[0];document.getElementById("cppTitle").textContent="选择颜色 · "+(lbl?lbl.label:varName);document.getElementById("cppHueThumb").style.left=(_cppCurHue/360*100)+"%";document.getElementById("cppHueThumb").style.background=cur;document.getElementById("cppLitThumb").style.left=_cppCurLit+"%";document.getElementById("cppHex").textContent=cur.toUpperCase();p.classList.add("open");var bd=document.getElementById("colorPickerBackdrop");if(bd)bd.classList.add("open");bindHueSlider("cppHue","cppHueThumb",function(h){_cppCurHue=h;applyCppLive()},function(){saveAndRefreshCpp()});bindLitSlider()}
+function bindLitSlider(){var sl=document.getElementById("cppLit");if(!sl||sl._bound)return;sl._bound=true;var dragging=false;function pos(clientX){var r=sl.getBoundingClientRect();var x=Math.max(0,Math.min(r.width,clientX-r.left));var pct=x/r.width;_cppCurLit=Math.round(pct*100);document.getElementById("cppLitThumb").style.left=(pct*100)+"%";applyCppLive()}function down(e){dragging=true;var t=e.touches?e.touches[0]:e;pos(t.clientX);if(e.cancelable)e.preventDefault()}function move(e){if(!dragging)return;var t=e.touches?e.touches[0]:e;pos(t.clientX);if(e.cancelable)e.preventDefault()}function up(){if(!dragging)return;dragging=false;saveAndRefreshCpp()}sl.addEventListener("touchstart",down,{passive:false});sl.addEventListener("touchmove",move,{passive:false});sl.addEventListener("touchend",up);sl.addEventListener("mousedown",down);document.addEventListener("mousemove",move);document.addEventListener("mouseup",up)}
+function applyCppLive(){if(!_cppCurVar)return;var hex=hslToHex(_cppCurHue,80,_cppCurLit);document.body.style.setProperty(_cppCurVar,hex);if(_cppCurVar==="--acc")document.body.style.setProperty("--acc-t",contrastText(hex));var hx=document.getElementById("cppHex");if(hx)hx.textContent=hex.toUpperCase();var th=document.getElementById("cppHueThumb");if(th)th.style.background=hex;document.querySelectorAll('.color-preview-dot[data-var="'+_cppCurVar+'"]').forEach(function(dot){dot.style.background=hex})}
+function saveAndRefreshCpp(){if(!_cppCurVar)return;var hex=hslToHex(_cppCurHue,80,_cppCurLit);if(!settings.customColors)settings.customColors={};settings.customColors[_cppCurVar]=hex;saveSettings();var rows=document.querySelectorAll("#settings-body .color-row");rows.forEach(function(row){var dot=row.querySelector(".color-preview-dot");var lbl=row.querySelector(".color-row-label");if(!dot||!lbl)return;var key=ADV_COLOR_KEYS.filter(function(k){return k.label===lbl.textContent})[0];if(key)dot.style.background=getEffectiveColor(key.varName)});document.querySelectorAll('#theme-adv-body .color-preview-dot').forEach(function(dot){var v=dot.getAttribute("data-var");if(v)dot.style.background=getEffectiveColor(v)})}
+function resetCustomColor(){if(!_cppCurVar)return;var savedVar=_cppCurVar;if(settings.customColors&&settings.customColors[savedVar]){delete settings.customColors[savedVar]}if(savedVar==="--acc"){settings.accent="";settings.accentHue=null}document.body.style.removeProperty(savedVar);if(savedVar==="--acc")document.body.style.removeProperty("--acc-t");saveSettings();applyTheme();document.querySelectorAll('.color-preview-dot[data-var="'+savedVar+'"]').forEach(function(dot){dot.style.background=getEffectiveColor(savedVar)});document.querySelectorAll("#settings-body .color-row").forEach(function(row){var dot=row.querySelector(".color-preview-dot");var lbl=row.querySelector(".color-row-label");if(!dot||!lbl)return;var key=ADV_COLOR_KEYS.filter(function(k){return k.label===lbl.textContent})[0];if(key&&key.varName===savedVar)dot.style.background=getEffectiveColor(savedVar)});var anchor=null;document.querySelectorAll('.color-preview-dot[data-var="'+savedVar+'"]').forEach(function(dot){if(!anchor)anchor=dot});if(anchor)openColorPicker(savedVar,anchor);showToast("已重置")}
+function closeColorPicker(){var p=document.getElementById("colorPickerPanel");if(p)p.classList.remove("open");var bd=document.getElementById("colorPickerBackdrop");if(bd)bd.classList.remove("open");_cppCurVar=null}
+/* ── 设置 handlers 已迁移至 src/ui/tabs/settings.js ── */
+function toggleDisplayCurrency(){fxTap();settings.displayCurrency=settings.displayCurrency==="CNY"?"EUR":"CNY";saveSettings();render()}
+// F24: Web Speech API 语音输入
+// L_FIX3: 持续识别模式 — 只有再次点麦克风按钮才停止
+var _speechRec=null,_speechActive=false,_speechUserStop=false,_speechFinalText="";
+// L2: 清空记一笔输入并关闭
+function clearInputField(alsoClose){var f=document.getElementById("field");if(f)f.value="";fxClose();if(alsoClose)closeOv("ov-input");}
+function toggleVoice(){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){fxError();showToast("当前浏览器不支持语音识别");return;}
+  var btn=document.getElementById("micBtn");
+  if(_speechActive){
+    // 用户主动停止
+    _speechUserStop=true;
+    if(_speechRec)try{_speechRec.stop();}catch(e){}
+    _speechActive=false;
+    if(btn)btn.classList.remove("listening");
+    fxClose();
+    return;
+  }
+  if(!_speechRec){
+    _speechRec=new SR();
+    _speechRec.lang="zh-CN";
+    _speechRec.continuous=true;       // 持续识别（不在静默时自动停止）
+    _speechRec.interimResults=true;   // 中间结果也回调，便于实时回填
+    _speechRec.onresult=function(ev){
+      // 累积已"final"的部分到 _speechFinalText，再拼上当前的 interim 部分
+      var interim="";
+      for(var i=ev.resultIndex;i<ev.results.length;i++){
+        var r=ev.results[i];
+        if(r.isFinal){_speechFinalText+=r[0].transcript;}
+        else{interim+=r[0].transcript;}
+      }
+      var f=document.getElementById("field");if(f)f.value=(_speechFinalText+interim).trim();
+    };
+    _speechRec.onend=function(){
+      // 若用户没主动停止（continuous 在某些浏览器仍会被静默触发结束），自动重启
+      if(!_speechUserStop){
+        try{_speechRec.start();return;}catch(e){}
+      }
+      _speechActive=false;
+      if(btn)btn.classList.remove("listening");
+      fxClose();
+    };
+    _speechRec.onerror=function(ev){
+      // 'no-speech' / 'aborted' 等可恢复错误，且非用户主动停止时重启
+      if(!_speechUserStop&&ev&&(ev.error==="no-speech"||ev.error==="aborted"||ev.error==="audio-capture")){
+        try{_speechRec.start();return;}catch(e){}
+      }
+      _speechActive=false;
+      _speechUserStop=true;
+      if(btn)btn.classList.remove("listening");
+      fxError();
+    };
+  }
+  // 重新开始时清空累积文本（沿用输入框原有内容做基线）
+  _speechUserStop=false;
+  _speechFinalText="";
+  try{_speechRec.start();_speechActive=true;if(btn)btn.classList.add("listening");fxOpen();}
+  catch(e){fxError();showToast("无法启动语音识别");}
+}
+function openThemeAdvanced(){fxOpen();var body=document.getElementById("theme-adv-body");if(!body)return;body.innerHTML='<div class="adv-color-list">'+ADV_COLOR_KEYS.map(function(k){var cur=getEffectiveColor(k.varName);return'<div class="color-row"><div class="color-row-label">'+k.label+'</div><div class="color-preview-dot" data-var="'+k.varName+'" style="background:'+cur+'" onclick="openColorPicker(\''+k.varName+'\',this)"></div></div>'}).join("")+'</div>';document.getElementById("ov-theme-adv").style.display="flex";function refreshDots(){body.querySelectorAll(".color-preview-dot").forEach(function(dot){var v=dot.getAttribute("data-var");if(v)dot.style.background=getEffectiveColor(v)})}setTimeout(refreshDots,20);setTimeout(refreshDots,120)}
+function closeThemeAdvanced(){closeOv("ov-theme-adv")}
+function resetAllCustomColors(){if(!confirm("重置所有自定义颜色？"))return;settings.customColors={};settings.accent="";settings.accentHue=null;["--acc","--acc-t","--hero-bg","--bg","--card","--card-alt","--nav-bg","--t1","--t2","--t3","--bdr"].forEach(function(v){document.body.style.removeProperty(v)});saveSettings();applyTheme();try{render()}catch(e){}try{if(typeof renderSettings==="function")renderSettings()}catch(e){}openThemeAdvanced();showToast("已全部重置为主题色")}
+/* ── 导出/汇率/预算 handlers 已迁移至 src/ui/tabs/settings.js + goals.js ── */
+function addBudgetCat(){var name=prompt("新类别名称：");if(!name)return;name=name.trim();if(!name)return;if(budgets[name]!==undefined){showToast("该类别已存在");return}budgets[name]=0;saveBudgets();renderGoals();fxTap()}
+/* ── cleanupTxs 已迁移至 src/ui/tabs/settings.js ── */
+function deleteBudgetCat(c){if(!confirm("删除「"+c+"」预算？"))return;delete budgets[c];if(settings.budgetCatOrder){settings.budgetCatOrder=settings.budgetCatOrder.filter(function(x){return x!==c});saveSettings()}saveBudgets();renderGoals();fxDelete();showToast("已删除")}
+function openBudgetCatEditor(){fxOpen();var list=getBudgetCatList();if(!settings.budgetCatOrder)settings.budgetCatOrder=list.slice();document.getElementById("ov-bcat-edit").style.display="flex";renderBudgetCatEditor()}
+function closeBudgetCatEditor(){saveSettings();renderGoals();document.getElementById("ov-bcat-edit").style.display="none";fxClose()}
+function renderBudgetCatEditor(){
+    var listEl=document.getElementById("bcatEditList");if(!listEl)return;listEl.innerHTML="";
+    (settings.budgetCatOrder||[]).forEach(function(c,i){
+        var r=document.createElement("div");r.className="bcat-row";r.setAttribute("data-i",i);r.setAttribute("draggable","true");var ico=document.createElement("div");ico.className="bcat-row-ico";ico.innerHTML=getCatIcon(c)||CAT_ICO[c]||"📦";var nm=document.createElement("div");nm.className="bcat-row-name";nm.textContent=c;var del=document.createElement("div");del.className="bcat-row-del";del.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';del.title="删除";del.onclick=function(e){e.stopPropagation();if(!confirm("删除「"+c+"」预算？"))return;delete budgets[c];settings.budgetCatOrder.splice(i,1);saveBudgets();saveSettings();renderBudgetCatEditor();fxDelete()};var drag=document.createElement("div");drag.className="bcat-row-drag";drag.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/></svg>';r.appendChild(ico);r.appendChild(nm);r.appendChild(del);r.appendChild(drag);r.addEventListener("dragstart",function(e){e.dataTransfer.setData("text/plain",String(i));r.classList.add("dragging")});r.addEventListener("dragend",function(){r.classList.remove("dragging")});r.addEventListener("dragover",function(e){e.preventDefault()});r.addEventListener("drop",function(e){e.preventDefault();var src=parseInt(e.dataTransfer.getData("text/plain"));var dst=i;if(src===dst||isNaN(src))return;var arr=settings.budgetCatOrder;var moved=arr.splice(src,1)[0];arr.splice(dst,0,moved);saveSettings();renderBudgetCatEditor()});drag.addEventListener("touchstart",function(e){e.preventDefault();r.classList.add("dragging")},{passive:false});drag.addEventListener("touchmove",function(e){e.preventDefault();var y=e.touches[0].clientY,el=document.elementFromPoint(e.touches[0].clientX,y);while(el&&!el.classList.contains("bcat-row"))el=el.parentNode;if(!el||el===r)return;var ti=parseInt(el.getAttribute("data-i"));if(isNaN(ti))return;var arr=settings.budgetCatOrder;var moved=arr.splice(i,1)[0];arr.splice(ti,0,moved);saveSettings();renderBudgetCatEditor()},{passive:false});drag.addEventListener("touchend",function(){r.classList.remove("dragging")});listEl.appendChild(r)
+    });
+    if(!(settings.budgetCatOrder||[]).length){listEl.innerHTML='<div style="text-align:center;padding:30px;color:var(--t3);font-size:12px">暂无类别，点右上 + 添加</div>'}
+}
+function addBudgetCatNew(){var name=prompt("新类别名称：");if(!name)return;name=name.trim();if(!name)return;if(!settings.budgetCatOrder)settings.budgetCatOrder=getBudgetCatList();if(settings.budgetCatOrder.indexOf(name)>=0){showToast("已存在");return}settings.budgetCatOrder.push(name);saveSettings();renderBudgetCatEditor();fxTap()}
+/* ── addGoal/deleteGoal 已迁移至 src/ui/tabs/goals.js ── */
+
+function downloadBlob(content,filename,mime){try{var blob=new Blob([content],{type:mime||"text/plain"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url)},200)}catch(e){console.error("下载失败",e);showToast("下载失败")}}
+
+/* ── 导入功能已迁移至 src/ui/tabs/settings.js ── */
+
+function toggleSavingsPanel(){var panel=document.getElementById("savings-panel");var arrow=document.getElementById("savings-arrow");if(!panel)return;var open=panel.classList.toggle("open");if(arrow)arrow.classList.toggle("open",open)}
+function startEditUserName(){var wrap=document.getElementById("user-name-wrap");var disp=document.getElementById("user-name-disp");if(!wrap||!disp)return;var cur=disp.textContent;var inp=document.createElement("input");inp.className="user-name-input";inp.value=cur;inp.maxLength=12;wrap.innerHTML="";wrap.appendChild(inp);inp.focus();inp.select();function save(){var v=inp.value.trim()||"Sunnn";lsSet("userName",v);wrap.innerHTML='<span class="user-name" id="user-name-disp" onclick="startEditUserName()">'+v+'</span>'}inp.addEventListener("blur",save);inp.addEventListener("keydown",function(e){if(e.key==="Enter")inp.blur();if(e.key==="Escape"){wrap.innerHTML='<span class="user-name" id="user-name-disp" onclick="startEditUserName()">'+cur+'</span>'}})}
+/* ── openSearchSheet/doSearchSheet 已迁移至 src/ui/modals/search.js ── */
+function closeOv(id){fxClose();document.getElementById(id).style.display="none";if(id==="ov-delete-confirm"){var shd=document.getElementById("sh-delete-confirm");if(shd){shd.style.transform="";shd.style.transition=""}resetDeleteConfirmRow();deleteConfirmIdx=-1}if(id==="ov-confirm"){document.getElementById("okbtn").style.display="";document.getElementById("okbtn").onclick=doConfirm;pending=[];confirmYearOnly=false}if(id==="ov-detail")detailIdx=-1;if(id==="ov-manual")editIdx=-1;if(id==="ov-input"){document.getElementById("aiSugRow").style.display="none";document.getElementById("aiSugRow").innerHTML=""}if(id==="ov-search"){var inp=document.getElementById("searchSheetInput");if(inp)inp.value="";var res=document.getElementById("searchSheetResults");if(res)res.innerHTML=""}}
+function showToast(msg){var t=document.getElementById("toast");t.textContent=msg;t.style.display="block";setTimeout(function(){t.style.display="none"},2000)}
+function escTx(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;")}
+/* ── bindHueSlider 已迁移至 src/ui/tabs/settings.js ── */
+/* ── selType/selCur/selCat/buildCatGrid/showManualSug/deleteSug 已迁移至 src/ui/modals/manual.js + input.js ── */
+/* ── 月份选择器已迁移至 src/ui/modals/month-picker.js ── */
+function cp(k){var inp=document.getElementById("mamt");var cur=inp.value||"0";if(k==="C"){inp.value="";cOp=null;cPrev=null;cReset=false;document.getElementById("calcExpr").textContent=""}else if(k==="⌫"){inp.value=cur.length>1?cur.slice(0,-1):""}else if(k==="="){if(cOp&&cPrev!==null){var a=parseFloat(cPrev),b=parseFloat(cur)||0,r;if(cOp==="+")r=a+b;else if(cOp==="-")r=a-b;else if(cOp==="×")r=a*b;else if(cOp==="÷")r=b?a/b:0;document.getElementById("calcExpr").textContent=cPrev+cOp+cur+"=";inp.value=parseFloat(r.toFixed(2));cOp=null;cPrev=null;cReset=true}}else if(["+","-","×","÷"].indexOf(k)>=0){document.getElementById("calcExpr").textContent=cur+k;cPrev=cur;cOp=k;cReset=true}else if(k==="."){if(cReset){inp.value="0.";cReset=false}else if(!cur.includes("."))inp.value=cur+"."}else{if(cReset){inp.value=k;cReset=false}else{if(cur==="0"||cur==="")inp.value=k;else if(cur.length<12)inp.value=cur+k}}}
+function syncCalc(){cOp=null;cPrev=null;cReset=false;document.getElementById("calcExpr").textContent=""}
+function selCM(el){document.querySelectorAll(".ym-btn").forEach(function(b){b.classList.remove("sel")});el.classList.add("sel");confirmMonthSel=parseInt(el.getAttribute("data-m"));var tv=document.getElementById("timeSv2");if(tv)tv.textContent=confirmYear+"年"+(confirmMonthSel+1)+"月";if(pending.length===1){var d=new Date(confirmYear,confirmMonthSel,1);pending[0].ts=d.getTime();pending[0].timeLabel=confirmYear+"年"+(confirmMonthSel+1)+"月";pending[0].timePrecision="month"}}
+function tryShowDatePicker(inp,ev){try{if(typeof inp.showPicker==="function"){inp.showPicker()}}catch(e){}}
+
+loadCustomCategories();loadAll();applyTheme();render();
+initSwipe("sh-confirm","hdl-confirm",function(){closeOv("ov-confirm");pending=[]});
+initSwipe("sh-manual","hdl-manual",function(){saveDraft();closeOv("ov-manual")});
+initSwipe("sh-detail","hdl-detail",function(){closeOv("ov-detail")});
+initSwipe("sh-input","hdl-input",function(){closeOv("ov-input")});
+initSwipe("sh-search","hdl-search",function(){closeOv("ov-search")});
+initSwipe("sh-catsettings","hdl-catsettings",function(){closeCatSettings()});
+initSwipe("sh-wheel-time","hdl-wheel-time",function(){closeWheelTime(false)});
+document.getElementById("field").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();doSend()}});
+document.getElementById("field").addEventListener("focus",function(){renderAiSug()});
+document.getElementById("field").addEventListener("blur",function(){hideAiSug()});
+document.getElementById("searchInput").addEventListener("keydown",function(e){if(e.key==="Enter")doSearch()});
+document.addEventListener("click",function(e){
+    if(listSwipeOpenTi&&!listSwipeOpenTi.contains(e.target))resetListSwipeAll();
+    if(!e.target.closest(".savings-toggle-wrap")){var p=document.getElementById("savings-panel"),a=document.getElementById("savings-arrow");if(p){p.classList.remove("open")}if(a)a.classList.remove("open")}
+    if(!e.target.closest("#inlinePop")&&!e.target.closest("#catPop")&&!e.target.closest("#timePop")&&!e.target.closest(".inline-inp")&&!e.target.closest(".tim-date")&&!e.target.closest(".tia")&&!e.target.closest(".tic"))closeAllPopups();
+});
+function closeAllPopups(){var s=document.getElementById("inlinePop");if(s)s.remove();var c=document.getElementById("catPop");if(c)c.remove();var t=document.getElementById("timePop");if(t)t.remove();/* 历史死代码：closePopOnOut 早已被删除但此处遗漏。其对应的 addEventListener 也从未注册过，故安全移除。 */}
+
+document.addEventListener("click",function(e){cppOutsideClick(e)});
+function cppOutsideClick(e){var p=document.getElementById("colorPickerPanel");if(!p||!p.classList.contains("open"))return;if(p.contains(e.target))return;if(e.target.classList&&e.target.classList.contains("color-preview-dot"))return;closeColorPicker()}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Supabase 账号 + 多端同步层
+   ────────────────────────────────────────────────────────────────────────
+   已迁移至 ES 模块：
+     - state/auth.js   — 账号认证
+     - state/sync.js   — 云端同步
+     - ui/modals/auth.js — 登录弹窗 UI
+     - main.js          — bootstrap 中 restoreSession/attachSync
+
+   下方仅保留 stub，让启动序列中的 inline save wrappers 不报错。
+   Supabase URL/Key 由模块层管理，inline 不再创建 client。
+   ════════════════════════════════════════════════════════════════════════ */
+var _currentUser=null;
+/* ──── inline auth/sync stubs（fallback，模块加载前不会被调用） ──── */
+function openAuthSheet(opts){/* 模块桥接覆盖 */}
+function doSignIn(){} function doSignUp(){} function doSignOut(){}
+function doSignInWithGoogle(){} function showForgotPasswordPrompt(){}
+function doUpdatePassword(){} function doManualSync(){}
+
+/* ──── inline Supabase 已移除（模块 state/auth + state/sync 接管） ──── */
+/* 保留 save 增强包装：给 tx 盖 id/updatedAt 以兼容模块 sync 的 last-write-wins */
+(function(){
+  var _saveTxs=saveTxs;
+  saveTxs=function(next){
+    var now=Date.now();
+    if(Array.isArray(next)){
+      var prevById={};(txs||[]).forEach(function(t){if(t&&t.id)prevById[t.id]=t;});
+      next.forEach(function(t){
+        if(!t.id)t.id=String(t.ts)+"_"+Math.random().toString(36).slice(2,7);
+        var p=prevById[t.id];
+        if(!p||JSON.stringify(p)!==JSON.stringify(t))t.updatedAt=now;
+        else if(!t.updatedAt)t.updatedAt=p.updatedAt||now;
+      });
+    }
+    _saveTxs(next);
+    // 云端推送由模块层的 hookInlineSaves → store.setTxs → sync 接管
+  };
+})();
+</script>
+</body>
+</html>

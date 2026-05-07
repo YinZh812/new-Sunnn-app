@@ -1,0 +1,77 @@
+/* 9 套主题：覆盖 base.css 里的 :root 变量。 */
+.theme-yellow{
+    --bg:#FFFBE5;--hero-bg:#FFEEA1;--card:#FFFFFF;--card-alt:#FFF6CC;
+    --bdr:#FFE072;--bdr2:#FFF1B0;--div:#F5DFC4;--div-strong:#FFD000;
+    --t1:#2A2400;--t2:#7A6A1E;--t3:#BFA850;--t4:#9A8A30;
+    --acc:#FFB700;--acc-t:#2A2400;
+    --nav-bg:#FFFFFF;--nav-icon:#BFA850;--nav-icon-on:#FFB700;
+    --sheet:#FFFCEB;--inp:#FFFFFF;
+    --income:#FFB700;--expense:#2A2400;--savings:#FFB700;
+}
+.theme-mint{
+    --bg:#EBF7EF;--hero-bg:#D8F3DC;--card:#FFFFFF;--card-alt:#B7E4C7;
+    --bdr:#95D5B2;--bdr2:#D8F3DC;--div:#B7E4C7;--div-strong:#74C69D;
+    --t1:#0F2A1A;--t2:#3F7556;--t3:#95B8A0;--t4:#5A9A80;
+    --acc:#52B788;--acc-t:#FFFFFF;
+    --nav-bg:#FFFFFF;--nav-icon:#95B8A0;--nav-icon-on:#52B788;
+    --sheet:#F0FAF5;--inp:#FFFFFF;
+    --income:#52B788;--expense:#0F2A1A;--savings:#52B788;
+}
+.theme-ocean{
+    --bg:#EAF4F8;--hero-bg:#A9D6E5;--card:#FFFFFF;--card-alt:#C8E1EE;
+    --bdr:#89C2D9;--bdr2:#C8E1EE;--div:#89C2D9;--div-strong:#61A5C2;
+    --t1:#0E2540;--t2:#2C7DA0;--t3:#6F9BB6;--t4:#468FAF;
+    --acc:#468FAF;--acc-t:#FFFFFF;
+    --nav-bg:#FFFFFF;--nav-icon:#6F9BB6;--nav-icon-on:#2C7DA0;
+    --sheet:#F2F9FB;--inp:#FFFFFF;
+    --income:#2C7DA0;--expense:#0E2540;--savings:#468FAF;
+}
+.theme-pink{
+    --bg:#FFF0FB;--hero-bg:#FFCBF2;--card:#FFFFFF;--card-alt:#F3C4FB;
+    --bdr:#ECBCFD;--bdr2:#FFE0F8;--div:#ECBCFD;--div-strong:#E5B3FE;
+    --t1:#2A0A28;--t2:#8A4A8A;--t3:#C09BC5;--t4:#A06FA8;
+    --acc:#B080CC;--acc-t:#FFFFFF;
+    --nav-bg:#FFFFFF;--nav-icon:#C09BC5;--nav-icon-on:#B080CC;
+    --sheet:#FFF5FB;--inp:#FFFFFF;
+    --income:#B080CC;--expense:#2A0A28;--savings:#B080CC;
+}
+.theme-meadow{
+    --bg:#FEFAE0;--hero-bg:#FAEDCD;--card:#FFFFFF;--card-alt:#E9EDC9;
+    --bdr:#CCD5AE;--bdr2:#FAEDCD;--div:#E9EDC9;--div-strong:#CCD5AE;
+    --t1:#2A2208;--t2:#8A6F38;--t3:#BFA075;--t4:#A07A50;
+    --acc:#D4A373;--acc-t:#FFFFFF;
+    --nav-bg:#FFFFFF;--nav-icon:#BFA075;--nav-icon-on:#D4A373;
+    --sheet:#FFFCEB;--inp:#FFFFFF;
+    --income:#D4A373;--expense:#2A2208;--savings:#D4A373;
+}
+.theme-gray{
+    --bg:#F2F2F2;--hero-bg:#FFFFFF;--card:#FFFFFF;--card-alt:#E8E8E8;
+    --bdr:#CCCCCC;--bdr2:#E0E0E0;--div:#CCCCCC;--div-strong:#A5A5A5;
+    --t1:#1A1A1A;--t2:#595959;--t3:#A5A5A5;--t4:#7F7F7F;
+    --acc:#7F7F7F;--acc-t:#FFFFFF;
+    --nav-bg:#FFFFFF;--nav-icon:#A5A5A5;--nav-icon-on:#1A1A1A;
+    --sheet:#FFFFFF;--inp:#F2F2F2;
+    --income:#1A1A1A;--expense:#1A1A1A;--savings:#7F7F7F;
+}
+.theme-white{
+    --bg:#FFFFFF;--hero-bg:#F8F9FA;--card:#FFFFFF;--card-alt:#F8F9FA;
+    --bdr:#E9ECEF;--bdr2:#F1F3F5;--div:#E9ECEF;--div-strong:#CED4DA;
+    --t1:#000000;--t2:#343A40;--t3:#ADB5BD;--t4:#6C757D;
+    --acc:#495057;--acc-t:#FFFFFF;
+    --nav-bg:#FFFFFF;--nav-icon:#ADB5BD;--nav-icon-on:#000000;
+    --sheet:#FFFFFF;--inp:#F8F9FA;
+    --income:#000000;--expense:#000000;--savings:#495057;
+}
+.theme-dark{
+    --bg:#000000;--hero-bg:#000000;--card:#1F2326;--card-alt:#2A2D31;
+    --bdr:#343A40;--bdr2:#2A2D31;--div:#343A40;--div-strong:#495057;
+    --t1:#FFFFFF;--t2:#ADB5BD;--t3:#6C757D;--t4:#8A929A;
+    --acc:#CED4DA;--acc-t:#000000;
+    --nav-bg:#000000;--nav-icon:#6C757D;--nav-icon-on:#FFFFFF;
+    --sheet:#1F2326;--inp:#2A2D31;
+    --income:#FFFFFF;--expense:#FFFFFF;--savings:#CED4DA;
+}
+.theme-blue{--bg:#EAF4F8;--hero-bg:#A9D6E5;--card:#FFFFFF;--card-alt:#C8E1EE;--bdr:#89C2D9;--bdr2:#C8E1EE;--t1:#0E2540;--t2:#2C7DA0;--t3:#6F9BB6;--acc:#468FAF;--acc-t:#FFFFFF;--nav-bg:#FFFFFF;--nav-icon:#6F9BB6;--nav-icon-on:#2C7DA0;--sheet:#F2F9FB;--inp:#FFFFFF;--savings:#468FAF;}
+.theme-warm{--bg:#FFFBE5;--hero-bg:#FFEEA1;--card:#FFFFFF;--card-alt:#FFF6CC;--bdr:#FFE072;--bdr2:#FFF1B0;--t1:#2A2400;--t2:#7A6A1E;--t3:#BFA850;--acc:#FFB700;--acc-t:#2A2400;--nav-bg:#FFFFFF;--nav-icon:#BFA850;--nav-icon-on:#FFB700;--sheet:#FFFCEB;--inp:#FFFFFF;--savings:#FFB700;}
+.theme-rose{--bg:#FFF0FB;--hero-bg:#FFCBF2;--card:#FFFFFF;--card-alt:#F3C4FB;--bdr:#ECBCFD;--bdr2:#FFE0F8;--t1:#2A0A28;--t2:#8A4A8A;--t3:#C09BC5;--acc:#B080CC;--acc-t:#FFFFFF;--nav-bg:#FFFFFF;--nav-icon:#C09BC5;--nav-icon-on:#B080CC;--sheet:#FFF5FB;--inp:#FFFFFF;--savings:#B080CC;}
+.theme-purple{--bg:#000000;--hero-bg:#000000;--card:#1F2326;--card-alt:#2A2D31;--bdr:#343A40;--bdr2:#2A2D31;--t1:#FFFFFF;--t2:#ADB5BD;--t3:#6C757D;--acc:#CED4DA;--acc-t:#000000;--nav-bg:#000000;--nav-icon:#6C757D;--nav-icon-on:#FFFFFF;--sheet:#1F2326;--inp:#2A2D31;--savings:#CED4DA;}

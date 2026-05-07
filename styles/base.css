@@ -1,0 +1,38 @@
+/* 基础重置 + 全局 CSS 变量。所有主题、组件都依赖这里定义的 --xx 变量。 */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+    --safe-top:env(safe-area-inset-top,44px);
+    --safe-bot:env(safe-area-inset-bottom,0px);
+    --bg:#FFFFFF;
+    --hero-bg:#F5F5F5;
+    --card:#FFFFFF;
+    --card-alt:#F7F7F7;
+    --bdr:#ECECEC;
+    --bdr2:#F6F6F6;
+    --div:#E5E5E5;
+    --div-strong:#D0D0D0;
+    --t1:#1A1A1A;
+    --t2:#8C8C8C;
+    --t3:#B5B5B5;
+    --t4:#9A9A9A;
+    --acc:#0A0A0A;
+    --acc-t:#FFFFFF;
+    --income:#0A0A0A;
+    --expense:#0A0A0A;
+    --savings:#2255AA;
+    --nav-bg:#FFFFFF;
+    --nav-icon:#A5A5A5;
+    --nav-icon-on:#1A1A1A;
+    --sheet:#FFFFFF;
+    --inp:#F7F7F7;
+    --inp-bdr:transparent;
+    --radius:16px;
+    --radius-sm:12px;
+    --radius-xs:8px;
+    --font-app:'Quicksand','Nunito',-apple-system,'SF Pro Display',system-ui,'PingFang SC','Microsoft YaHei',sans-serif;
+    --font-digit:'Quicksand','Nunito',-apple-system,'SF Pro Display',system-ui,sans-serif;
+    --hero:var(--hero-bg);--hero-t:var(--t1);--hero-sub:var(--t2);
+    --nav:var(--nav-bg);--nav-t:var(--nav-icon);--nav-ta:var(--nav-icon-on);
+    --bar:var(--card-alt);--bar-bdr:var(--bdr);
+    --sec:var(--card-alt);--sec-t:var(--t2);
+}
