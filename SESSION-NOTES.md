@@ -6,7 +6,7 @@
 
 ## 一句话现状
 
-`index.html` 从 2109 行单文件起步，经过模块化重构后**双轨运行**：模块化源码（`src/` 33 个文件）已完整接管 Hero、列表、分析页、设置页、目标页、推荐词、以及 **7 个 modal 中的 6 个**。第一轮死代码清理已完成（删 143 行），inline `<script>` 剩余约 680 行：render/renderList（首屏 fallback）、内联编辑、WheelTime、类别设置、手动记账变量/函数、语音识别、高级主题、输入流、nav 导航、列表滑删。下一步：激活模块 nav → 删 inline showPage/goTab。
+`index.html` 从 2109 行单文件起步 → 现在 959 行。模块化源码（`src/` 33 个文件）已完整接管 Hero、列表、分析页、设置页、目标页、推荐词、7 个 modal、**导航系统**、**渲染枢纽**。inline `<script>` 剩余约 620 行：内联编辑、WheelTime、类别设置、手动记账变量/函数、语音识别、高级主题、输入流、列表滑删。
 
 ---
 
@@ -132,8 +132,12 @@ inline 与模块的 auth.js 各创建了一个 Supabase client。两者共享同
      高级主题自定义、nav（showPage/goTab）、输入流（doSend/_doSendFinish）、
      预算类别编辑器、下载/导入帮手函数
    - 未删手动记账函数（selTypeTab/syncTypeTabs/mcInput 等），因与类别设置共享状态，留给第二轮
-6. **激活模块的 `attachNavClicks` 与 `showTab`**（inline 的 `goTab/showPage` 退役）
-7. **最终 inline `<script>` 应该接近空**——只剩个别启动调用
+6. ~~**激活模块的 `attachNavClicks` 与 `showTab`**~~ ✅ 已完成
+   - `src/ui/components/nav.js`：showTab 内同步 `window.currentTab`
+   - `src/main.js`：激活 attachNavClicks、showTab("main") 首屏、window.showPage/window.render 桥接
+   - `index.html`：删除 showPage/goTab 函数、render/renderList 函数、移除 nav onclick 属性
+   - 删 render/renderList 约 53 行，inline 从 1008 → 959 行
+7. **继续清理 inline 死代码**（内联编辑、WheelTime、类别设置、手动记账、语音识别、高级主题、输入流、列表滑删）
 
 ---
 

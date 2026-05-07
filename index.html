@@ -378,59 +378,10 @@ function fmtFull(t){var d=new Date(t.ts);var datePart=d.getFullYear()+"年"+(d.g
 function getTopDescs(limit,exclude){var freq={};txs.forEach(function(t){if(t.desc&&t.desc.length>1&&t.desc!==t.category)freq[t.desc]=(freq[t.desc]||0)+1});return Object.keys(freq).filter(function(d){return d!==exclude&&deletedSugs.indexOf(d)===-1}).sort(function(a,b){return freq[b]-freq[a]}).slice(0,limit||10)}
 
 function changeMonth(d){viewMonth+=d;if(viewMonth>11){viewMonth=0;viewYear++}if(viewMonth<0){viewMonth=11;viewYear--}render();if(currentTab==="analysis")renderAnalysis()}
-function render(){
-    var mo=txs.filter(function(t){var d=new Date(t.ts);return d.getMonth()===viewMonth&&d.getFullYear()===viewYear});
-    // ── Hero 渲染 ──
-    // 主路径：模块版（src/ui/tabs/main.js renderHero）
-    //   把 inline 视图状态/数据同步到 store，setTxs 会触发 store.on("txs:changed") → renderHero
-    //   见 src/ARCHITECTURE.md "渐进迁移操作手册"
-    if(window.acct){
-        window.acct.tabs.mainTab.setViewYearMonth(viewYear,viewMonth);
-        window.acct.store.setSettings(settings);
-        window.acct.store.setTxs(txs);
-    }else{
-        // Fallback：模块尚未加载完时，用 inline 旧逻辑保证首屏不空白。
-        // 模块 bootstrap 完成后会接管，此分支基本不会再走到。
-        var net=mo.reduce(function(a,t){return a+netV(t)},0);
-        document.getElementById("hnet").textContent=(net>=0?"+":"−")+Math.abs(net).toFixed(2)+" €";
-        document.getElementById("hperiod").textContent=viewYear+"年 · "+(viewMonth+1)+"月";
-        document.getElementById("navTitle").textContent=viewYear+"年"+(viewMonth+1)+"月 ▾";
-        var anP=document.getElementById("an-period");if(anP)anP.textContent=viewYear+"年"+(viewMonth+1)+"月 ▾";
-        var incEUR=sumT(mo,"income"),expEUR=sumT(mo,"expense"),savEUR=sumT(mo,"savings");
-        var dispCur=settings.displayCurrency||"EUR";var rateNow=rate();
-        var inc=dispCur==="CNY"?incEUR*rateNow:incEUR,exp=dispCur==="CNY"?expEUR*rateNow:expEUR,sav=dispCur==="CNY"?savEUR*rateNow:savEUR;
-        var dispSym=dispCur==="CNY"?"¥":"€";
-        document.getElementById("sin").textContent=inc.toFixed(2)+" "+dispSym;
-        document.getElementById("sout").textContent=exp.toFixed(2)+" "+dispSym;
-        document.getElementById("ssave").textContent=sav.toFixed(2)+" "+dispSym;
-        var ctb=document.getElementById("curToggleBtn");if(ctb)ctb.textContent=dispSym;
-        function setEl(id,v){var el=document.getElementById(id);if(el)el.textContent=v}
-        function splitNum(n){var s=n.toFixed(2),p=s.indexOf(".");return{int:s.slice(0,p),dec:s.slice(p)}}
-        var moPad=pad(viewMonth+1);setEl("a2-year",viewYear+"年");setEl("a2-month",moPad);
-        var incS=splitNum(inc),expS=splitNum(exp);setEl("a2-income-int",incS.int);setEl("a2-income-dec",incS.dec);setEl("a2-expense-int",expS.int);setEl("a2-expense-dec",expS.dec);
-        var savAmt=document.getElementById("savings-panel-amt");if(savAmt)savAmt.textContent=sav.toFixed(2)+" "+dispSym;
-    }
-    renderList(mo);
-}
+/* ── render() 已迁移：window.render 桥接 → mainTab.renderList + store 事件 → renderHero ── */
 /* ── renderAiSug/hideAiSug 已迁移至 src/ui/modals/input.js ── */
 
-function renderList(mo){
-    listSwipeOpenTi=null;
-    var list=document.getElementById("list");
-    var old=list.querySelectorAll(".tg,.sec,.list-edge-indicator");for(var i=0;i<old.length;i++)old[i].remove();
-    if(!mo.length){list.innerHTML='<div class="empty-mo">本月暂无记录<br>点右下 + 手动添加<br>或输入一句话</div>';return}
-    list.innerHTML="";
-    var sorted=[].concat(mo).sort(function(a,b){
-        if(new Date(a.ts).toDateString()===new Date(b.ts).toDateString()){
-            var aT=(a.timePrecision==="exact"||a.timePrecision==="daytime");
-            var bT=(b.timePrecision==="exact"||b.timePrecision==="daytime");
-            if(!aT&&bT)return-1;if(aT&&!bT)return 1
-        }return b.ts-a.ts
-    });
-    var groups={},order=[];sorted.forEach(function(t){var d=new Date(t.ts);var k=t.timePrecision==="month"?(d.getFullYear()+"-"+d.getMonth()):t.timePrecision==="year_only"?(d.getFullYear()+"y"):d.toDateString();var lbl=groupListLbl(t);if(!groups[k]){groups[k]={lbl:lbl,items:[]};order.push(k)}groups[k].items.push(t)});
-    order.forEach(function(k){var g=groups[k],sec=document.createElement("div");sec.className="sec";var rN=rate();var inSum=0,exSum=0;g.items.forEach(function(t){var vEur=t.currency==="CNY"?t.amount/rN:t.amount;if(t.type==="income")inSum+=vEur;else if(t.type==="expense")exSum+=vEur});var sumHtml="";if(inSum>0&&exSum>0){sumHtml='<span class="sec-sum">收 +'+inSum.toFixed(2)+'€  支 −'+exSum.toFixed(2)+'€</span>'}else if(inSum>0){sumHtml='<span class="sec-sum">收 +'+inSum.toFixed(2)+'€</span>'}else if(exSum>0){sumHtml='<span class="sec-sum">支 −'+exSum.toFixed(2)+'€</span>'}sec.innerHTML='<span class="sec-lbl">'+g.lbl+'</span>'+sumHtml;list.appendChild(sec);var card=document.createElement("div");card.className="tg";g.items.forEach(function(t,ri){var ico=getCatIcon(t.category)||CAT_ICO[t.category]||"📦";var div=document.createElement("div");div.className="ti";var idx=txs.indexOf(t);div.setAttribute("data-idx",idx);div.innerHTML='<button type="button" class="ti-delete-btn" aria-label="删除"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg></button><div class="ti-content"><div class="tic" data-role="cat">'+ico+'</div><div class="tin" data-role="desc"><div class="tid">'+t.desc+'</div>'+listTimBlockHtml(t)+'</div><div class="tia" data-role="amt">'+fmtA(t)+'</div><div class="ti-more" data-role="detail"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div></div>';bindListRowSwipe(div);card.appendChild(div)});list.appendChild(card)});
-    initListEdgeScroll(list);
-}
+/* ── renderList() 已迁移：window.renderList → mainTab.renderList (src/ui/tabs/main.js) ── */
 
 // ── 列表边缘滑动切换月份 ──
 var _listEdgeState=null;
@@ -943,7 +894,8 @@ function syncCalc(){cOp=null;cPrev=null;cReset=false;document.getElementById("ca
 function selCM(el){document.querySelectorAll(".ym-btn").forEach(function(b){b.classList.remove("sel")});el.classList.add("sel");confirmMonthSel=parseInt(el.getAttribute("data-m"));var tv=document.getElementById("timeSv2");if(tv)tv.textContent=confirmYear+"年"+(confirmMonthSel+1)+"月";if(pending.length===1){var d=new Date(confirmYear,confirmMonthSel,1);pending[0].ts=d.getTime();pending[0].timeLabel=confirmYear+"年"+(confirmMonthSel+1)+"月";pending[0].timePrecision="month"}}
 function tryShowDatePicker(inp,ev){try{if(typeof inp.showPicker==="function"){inp.showPicker()}}catch(e){}}
 
-loadCustomCategories();loadAll();applyTheme();render();
+loadCustomCategories();loadAll();applyTheme();
+// 首屏渲染由模块 bootstrap 的 showTab("main") → mainTab.render() 接管
 initSwipe("sh-confirm","hdl-confirm",function(){closeOv("ov-confirm");pending=[]});
 initSwipe("sh-manual","hdl-manual",function(){saveDraft();closeOv("ov-manual")});
 initSwipe("sh-detail","hdl-detail",function(){closeOv("ov-detail")});

@@ -190,6 +190,21 @@ window.runVoiceTests = runVoiceTests;
 // nav.js 的 showTab 内部已同步 window.currentTab）。
 window.showPage = (p) => showTab(p);
 
+// ── 渐进迁移期：render 桥接（inline render() 已删除，枢纽逻辑在此）──
+//
+// inline 的 render() 是全局渲染枢纽，被 10+ 处调用（changeMonth / submitManual /
+// executeDeleteConfirm / toggleDisplayCurrency / 等）。桥接版负责：
+//   1. 把 inline viewYear/viewMonth 同步到模块
+//   2. 把 inline txs/settings 推到 store（触发 txs:changed → renderHero）
+//   3. 调 mainTab.renderList() 刷新列表
+// 不再需要传 pre-filtered mo——store 已有最新数据，renderList 内部过滤。
+window.render = () => {
+  mainTab.setViewYearMonth(window.viewYear, window.viewMonth);
+  store.setSettings(window.settings);
+  store.setTxs(window.txs);
+  mainTab.renderList();
+};
+
 // ── 渐进迁移期：把模块版纯帮手挂到 inline 同名全局，覆盖 inline 函数定义 ──
 //
 // 时序：inline <script> 同步执行时把 function pad/escTx/... 写到 window；
