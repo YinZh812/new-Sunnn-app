@@ -35,6 +35,7 @@ import {
 } from "./domain/currency.js";
 import { attachAudioUnlock } from "./ui/components/sfx.js";
 import { attachNavClicks, registerTab, showTab } from "./ui/components/nav.js";
+import * as wheelTime from "./ui/components/wheel-time.js";
 
 import * as mainTab     from "./ui/tabs/main.js";
 import * as analysisTab from "./ui/tabs/analysis.js";
@@ -328,6 +329,14 @@ window.clearInputField = inputModal.clearInputField;
 window.chooseCurrency  = currencyConfirmModal.choose;
 
 // ── 桥接 renderAiSug ────────────────────────────────────────────────────────
+// ── 桥接 toast ─────────────────────────────────────────────────────────────
+window.showToast = toast;
+
+// ── 桥接 WheelTime ─────────────────────────────────────────────────────────
+window.openWheelTime    = wheelTime.openWheelTime;
+window.closeWheelTime   = wheelTime.closeWheelTime;
+window.openWheelTimeForTx = wheelTime.openWheelTimeForTx;
+
 // ── 桥接内联编辑 ──────────────────────────────────────────────────────────
 window.inlineEditDesc = mainTab.inlineEditDesc;
 // inlineEditAmt 仍留在 inline（~25 行计算器状态机 + #ov-iamt 弹窗），待手动记账迁移时一并处理

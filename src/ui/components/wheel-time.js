@@ -174,3 +174,26 @@ export function closeWheelTime(save) {
   if (ov) ov.style.display = "none";
   fxClose();
 }
+
+/**
+ * 为某笔交易打开时间选择弹窗。与原 inline openWheelTimeForTx 行为完全等价。
+ * 依赖 window.saveTxs / window.render / window.showToast（均已桥接）。
+ */
+export function openWheelTimeForTx(idx) {
+  const txs = window.txs;
+  if (!txs || idx < 0 || idx >= txs.length) return;
+  const t = txs[idx];
+  if (!t) return;
+  const d = new Date(t.ts);
+  openWheelTime(d.getHours(), d.getMinutes(), (h, m) => {
+    const nd = new Date(t.ts);
+    nd.setHours(h, m, 0, 0);
+    t.ts = nd.getTime();
+    t.timePrecision = "exact";
+    t.timeLabel = "";
+    t.timePhrase = null;
+    if (typeof window.saveTxs === "function") window.saveTxs(txs);
+    if (typeof window.render === "function") window.render();
+    if (typeof window.showToast === "function") window.showToast("时间已更新 ✓");
+  });
+}
