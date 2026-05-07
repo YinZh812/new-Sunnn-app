@@ -355,20 +355,12 @@ function initSwipe(sheetId,hdlId,onClose){var sh=document.getElementById(sheetId
 /* ── 导航已迁移至 src/ui/components/nav.js（attachNavClicks + showTab）── */
 
 /* ── 语音解析已迁移至 src/domain/voice/ ── */
+/* ── rate/netV/sumT 已迁移：window.rate/netV/sumT → domain/currency.js ── */
+/* ── fmtA/fmtLabel/dayL/groupListLbl/listTimInnerText/listTimBlockHtml 已迁移 → utils/format.js + domain/dates.js ── */
+/* ── fmtFull 已迁移：window.fmtFull → domain/dates.js formatTransactionFull ── */
 
-function rate(){return settings.eurToCny||7.8}
-function netV(t){var v=t.currency==="CNY"?t.amount/rate():t.amount;return t.type==="expense"?-v:v}
-function sumT(arr,type){return arr.filter(function(t){return t.type===type||(t.type==="net_income"&&type==="income")}).reduce(function(a,t){return a+(t.currency==="CNY"?t.amount/rate():t.amount)},0)}
 function amtC(t){return t.type==="income"||t.type==="net_income"?"#1A7A40":t.type==="savings"?"#2255AA":"#CC2222"}
-function fmtA(t){return(t.type==="expense"?"−":"+")+t.amount.toFixed(2)+" "+(t.currency==="CNY"?"¥":"€")}
 function typeL(t){return{expense:"支出",income:"收入",savings:"储蓄",net_income:"支出但获得"}[t]||"支出"}
-function fmtLabel(t){if(t.timeLabel)return t.timeLabel;var d=new Date(t.ts);var base=(d.getMonth()+1)+"月"+d.getDate()+"日";if(!t.timePrecision||t.timePrecision==="day"||t.timePrecision==="month"||t.timePrecision==="year_only")return base;return base+" "+pad(d.getHours())+":"+pad(d.getMinutes())}
-var LIST_WK=["星期日","星期一","星期二","星期三","星期四","星期五","星期六"];
-function groupListLbl(t){var d=new Date(t.ts),prec=t.timePrecision||"";if(prec==="month")return pad(d.getMonth()+1)+"月";if(prec==="year_only")return d.getFullYear()+"年";return pad(d.getMonth()+1)+"月"+pad(d.getDate())+"日  "+LIST_WK[d.getDay()]}
-function listTimInnerText(t){var prec=t.timePrecision||"now";if(prec==="month"||prec==="year_only")return null;var d=new Date(t.ts);if(t.timePhrase&&prec==="exact")return pad(d.getHours())+":"+pad(d.getMinutes());if(t.timePhrase&&prec==="daytime")return t.timePhrase;if(prec==="day")return null;return pad(d.getHours())+":"+pad(d.getMinutes())}
-function listTimBlockHtml(t){var txt=listTimInnerText(t);var hide=txt?"":" style='display:none'";return'<div class="tim"'+hide+' data-idx="'+txs.indexOf(t)+'" onclick="event.stopPropagation();openWheelTimeForTx('+txs.indexOf(t)+')"><span class="tim-date" data-role="time">'+(txt||"")+'</span></div>'}
-function dayL(ts){var d=new Date(ts);return d.getFullYear()+"年"+(d.getMonth()+1)+"月"+d.getDate()+"日"}
-function fmtFull(t){var d=new Date(t.ts);var datePart=d.getFullYear()+"年"+(d.getMonth()+1)+"月"+d.getDate()+"日";if(t.timePrecision==="month")return d.getFullYear()+"年"+(d.getMonth()+1)+"月";if(t.timePrecision==="year_only")return d.getFullYear()+"年";if(t.timePhrase&&t.timePrecision==="exact")return datePart+" "+pad(d.getHours())+":"+pad(d.getMinutes());if(t.timePhrase&&t.timePrecision==="daytime")return datePart+" "+t.timePhrase;return datePart+" "+pad(d.getHours())+":"+pad(d.getMinutes())}
 function getTopDescs(limit,exclude){var freq={};txs.forEach(function(t){if(t.desc&&t.desc.length>1&&t.desc!==t.category)freq[t.desc]=(freq[t.desc]||0)+1});return Object.keys(freq).filter(function(d){return d!==exclude&&deletedSugs.indexOf(d)===-1}).sort(function(a,b){return freq[b]-freq[a]}).slice(0,limit||10)}
 
 function changeMonth(d){viewMonth+=d;if(viewMonth>11){viewMonth=0;viewYear++}if(viewMonth<0){viewMonth=11;viewYear--}render();if(currentTab==="analysis")renderAnalysis()}
