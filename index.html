@@ -332,7 +332,7 @@ var txs=[],settings={defaultCurrency:"EUR",eurToCny:7.8,theme:"gray",accent:"",a
 var viewYear=new Date().getFullYear(),viewMonth=new Date().getMonth();
 var pickerYear=new Date().getFullYear(),pickerYM=false;
 var pending=[],detailIdx=-1,editIdx=-1,currentTab="main",listSwipeOpenTi=null,deleteConfirmIdx=-1;
-var SWIPE_DEL_MAX=120,SWIPE_ACTIVATE_PX=10,SWIPE_SNAP_HALF=40;
+// SWIPE_DEL_MAX/SWIPE_ACTIVATE_PX/SWIPE_SNAP_HALF 随 bindListRowSwipe 迁移至模块 swipe.js
 var _wheelHours=0,_wheelMins=0,_wheelCallback=null;
 
 function pad(n){return String(n).padStart(2,"0")}
@@ -369,178 +369,13 @@ function changeMonth(d){viewMonth+=d;if(viewMonth>11){viewMonth=0;viewYear++}if(
 
 /* ── renderList() 已迁移：window.renderList → mainTab.renderList (src/ui/tabs/main.js) ── */
 
-// ── 列表边缘滑动切换月份 ──
-var _listEdgeState=null;
-function initListEdgeScroll(list){
-    // 【修复核心】：防止重复绑定事件导致一次滑动触发多次切换（解决月份乱跳）
-    if(list.dataset.edgeBound === 'true') return;
-    list.dataset.edgeBound = 'true';
-
-    var startY=0, currentY=0, isEdgeDrag=false, edgeDir=0;
-    var edgeTop=null, edgeBot=null;
-    var atTop=false, atBot=false;
-    
-    function ensureIndicators(){
-        if(!edgeTop){
-            edgeTop=document.createElement("div");
-            edgeTop.className="list-edge-indicator top";
-            edgeTop.textContent="▼ 下个月";
-            list.appendChild(edgeTop);
-        }
-        if(!edgeBot){
-            edgeBot=document.createElement("div");
-            edgeBot.className="list-edge-indicator bottom";
-            edgeBot.textContent="▲ 上个月";
-            list.appendChild(edgeBot);
-        }
-    }
-    
-    function removeIndicators(){
-        if(edgeTop){edgeTop.remove(); edgeTop=null;}
-        if(edgeBot){edgeBot.remove(); edgeBot=null;}
-    }
-    
-    function onTouchStart(e){
-        if(e.touches.length!==1)return;
-        atTop = list.scrollTop <= 1;
-        atBot = list.scrollTop + list.clientHeight >= list.scrollHeight - 1;
-        
-        if(!atTop && !atBot){
-            isEdgeDrag = false;
-            edgeDir = 0;
-            removeIndicators();
-            return;
-        }
-        
-        isEdgeDrag = true;
-        edgeDir = 0; 
-        startY = e.touches[0].clientY; 
-        currentY = startY;
-    }
-    
-    function onTouchMove(e){
-        if(!isEdgeDrag) return;
-        currentY = e.touches[0].clientY;
-        var dy = currentY - startY;
-        
-        if(edgeDir === 0){
-            if(Math.abs(dy) < 5) return;
-            if(dy > 0 && atTop) edgeDir = -1; // 向下划，触发顶部下拉
-            else if(dy < 0 && atBot) edgeDir = 1; // 向上划，触发底部上拉
-            else { isEdgeDrag = false; return; }
-            
-            ensureIndicators();
-            if(edgeDir === -1) edgeTop.classList.add("show");
-            else edgeBot.classList.add("show");
-        }
-        
-        // 越界回弹阻尼
-        if((edgeDir === -1 && dy < 0) || (edgeDir === 1 && dy > 0)){ dy *= 0.3; }
-        
-        var clamped = Math.max(-80, Math.min(80, Math.abs(dy))) * Math.sign(dy);
-        
-        // 保持水平居中
-        if(edgeDir === -1 && edgeTop){
-            edgeTop.style.transform = "translate(-50%, " + (clamped * 0.5) + "px)";
-            edgeTop.style.opacity = Math.min(1, Math.abs(clamped)/30);
-        }
-        else if(edgeDir === 1 && edgeBot){
-            edgeBot.style.transform = "translate(-50%, " + (clamped * 0.5) + "px)";
-            edgeBot.style.opacity = Math.min(1, Math.abs(clamped)/30);
-        }
-        
-        // 拖拽时屏蔽浏览器默认的橡皮筋回弹效果
-        if(Math.abs(dy) > 10 && e.cancelable) e.preventDefault();
-    }
-    
-    function onTouchEnd(e){
-        if(!isEdgeDrag) return;
-        isEdgeDrag = false;
-        if(edgeDir === 0) return;
-        
-        var finalY = e.changedTouches ? e.changedTouches[0].clientY : currentY;
-        var dy = finalY - startY;
-        
-        if(Math.abs(dy) > 40){
-            var step = 0;
-            if(edgeDir === -1 && dy > 0) step = 1;
-            else if(edgeDir === 1 && dy < 0) step = -1;
-            
-            if(step !== 0){
-                if(step === 1){
-                    var newMonth = viewMonth + 1;
-                    var newYear = viewYear;
-                    if(newMonth > 11){ newMonth = 0; newYear++; }
-                    var now = new Date();
-                    var realYear = now.getFullYear();
-                    var realMonth = now.getMonth();
-                    
-                    if(newYear > realYear || (newYear === realYear && newMonth > realMonth)){
-                        var hasFuture = txs.some(function(t){
-                            var d = new Date(t.ts);
-                            return d.getFullYear() === newYear && d.getMonth() === newMonth;
-                        });
-                        if(!hasFuture){
-                            if(typeof showToast === 'function') showToast('还没有未来记录');
-                            removeIndicators();
-                            return;
-                        }
-                    }
-                }
-                changeMonth(step);
-                if (typeof fxTab === 'function') fxTab();
-            }
-        }
-        removeIndicators();
-        edgeDir = 0;
-    }
-    
-    list.addEventListener("touchstart", onTouchStart, {passive: true});
-    list.addEventListener("touchmove", onTouchMove, {passive: false});
-    list.addEventListener("touchend", onTouchEnd);
-}
-
+/* ── initListEdgeScroll 已迁移至 src/ui/components/swipe.js（attachListEdgeMonthSwipe）── */
 /* ── 滚轮时间选择器 InfiniteWheel / openWheelTime / openWheelTimeForTx 已迁移至 src/ui/components/wheel-time.js ── */
 
-// ── 左滑删除（带阻尼+可变宽）──
+// ── 左滑删除残存 helpers（closeOtherListSwipe / resetListSwipeAll）──
+// 由 openDetail() 和 document click handler 调用；bindListRowSwipe 已迁移至 swipe.js
 function closeOtherListSwipe(keep){if(!listSwipeOpenTi||listSwipeOpenTi===keep)return;var prev=listSwipeOpenTi;var c=prev.querySelector(".ti-content");if(c){c.style.transition="transform .45s cubic-bezier(0.25, 1, 0.5, 1)";c.style.transform="translateX(0)"}prev.classList.remove("is-open");prev.classList.remove("is-sliding");listSwipeOpenTi=null}
 function resetListSwipeAll(){closeOtherListSwipe(null)}
-function bindListRowSwipe(el){
-    var content=el.querySelector(".ti-content");var delBtn=el.querySelector(".ti-delete-btn");
-    var startX=0,startY=0,currentX=0;var isSliding=false;var isOpen=false;
-    el.addEventListener("touchstart",function(e){startX=e.touches[0].clientX;startY=e.touches[0].clientY;content.style.transition="none";isSliding=false},{passive:true});
-    el.addEventListener("touchmove",function(e){
-        var dX=e.touches[0].clientX-startX;var dY=e.touches[0].clientY-startY;
-        if(!isSliding&&Math.abs(dX)>15&&Math.abs(dX)>Math.abs(dY)){isSliding=true;el.classList.add("is-sliding");if(dX<0)closeOtherListSwipe(el)}
-        if(isSliding){
-            var baseMove=isOpen?dX-80:dX;
-            var raw=Math.min(0,Math.max(-SWIPE_DEL_MAX-40,baseMove));
-            if(raw<-80){var beyond=raw+80;raw=-80+beyond*0.25}
-            currentX=raw;
-            content.style.transform="translateX("+currentX+"px)";
-            var btnW=Math.max(60,Math.min(120,Math.abs(currentX)+20));
-            if(delBtn)delBtn.style.width=btnW+"px";
-            if(e.cancelable)e.preventDefault();
-        }
-    },{passive:false});
-    el.addEventListener("touchend",function(){
-        content.style.transition="transform 0.35s cubic-bezier(0.25, 1, 0.5, 1)";
-        el.classList.remove("is-sliding");
-        if(isSliding){
-            if(currentX<-40){content.style.transform="translateX(-80px)";el.classList.add("is-open");isOpen=true;listSwipeOpenTi=el;if(delBtn)delBtn.style.width="80px"}else{content.style.transform="translateX(0)";el.classList.remove("is-open");isOpen=false;if(listSwipeOpenTi===el)listSwipeOpenTi=null;if(delBtn)delBtn.style.width="80px"}
-            setTimeout(function(){isSliding=false},100);
-        }
-    });
-    content.onclick=function(e){
-        if(isSliding)return;
-        if(isOpen){content.style.transform="translateX(0)";el.classList.remove("is-open");isOpen=false;if(delBtn)delBtn.style.width="80px";return}
-        var idx=parseInt(el.getAttribute("data-idx"));
-        if(e.target.closest(".tic")){if(typeof openDetail==="function")openDetail(idx)}
-        else if(e.target.closest(".tid")){if(typeof inlineEditDesc==="function")inlineEditDesc(idx,el)}
-        else if(e.target.closest(".tia")){if(typeof inlineEditAmt==="function")inlineEditAmt(idx,el)}
-    };
-    delBtn.onclick=function(e){e.preventDefault();e.stopPropagation();var idx=el.getAttribute("data-idx");if(typeof confirmDelete==="function"){confirmDelete(parseInt(idx))}};
-}
 
 function confirmDelete(id){if(id<0||id>=txs.length)return;deleteConfirmIdx=id;var t=txs[id],sg=t.type==="expense"?"−":"+",sym=t.currency==="CNY"?"¥":"€";document.getElementById("deleteConfirmBody").innerHTML='<div class="scard"><div class="srow"><span class="sk">描述</span><span class="sv2">'+escTx(t.desc)+'</span></div><div class="srow"><span class="sk">金额</span><span class="sv2" style="color:'+amtC(t)+'">'+sg+t.amount.toFixed(2)+" "+sym+'</span></div></div>';document.getElementById("ov-delete-confirm").style.display="flex"}
 function resetDeleteConfirmRow(){if(deleteConfirmIdx<0)return;var el=document.querySelector('.ti[data-idx="'+deleteConfirmIdx+'"]');if(el){var c=el.querySelector(".ti-content");if(c){c.style.transition="transform .35s cubic-bezier(0.25, 1, 0.5, 1)";c.style.transform="translateX(0)"}}if(listSwipeOpenTi===el)listSwipeOpenTi=null}
