@@ -471,62 +471,9 @@ function closeColorPicker(){var p=document.getElementById("colorPickerPanel");if
 function toggleDisplayCurrency(){fxTap();settings.displayCurrency=settings.displayCurrency==="CNY"?"EUR":"CNY";saveSettings();render()}
 // F24: Web Speech API 语音输入
 // L_FIX3: 持续识别模式 — 只有再次点麦克风按钮才停止
-var _speechRec=null,_speechActive=false,_speechUserStop=false,_speechFinalText="";
-// L2: 清空记一笔输入并关闭 —— clearInputField 已迁移至 src/ui/modals/input.js
-function toggleVoice(){
-  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){fxError();showToast("当前浏览器不支持语音识别");return;}
-  var btn=document.getElementById("micBtn");
-  if(_speechActive){
-    // 用户主动停止
-    _speechUserStop=true;
-    if(_speechRec)try{_speechRec.stop();}catch(e){}
-    _speechActive=false;
-    if(btn)btn.classList.remove("listening");
-    fxClose();
-    return;
-  }
-  if(!_speechRec){
-    _speechRec=new SR();
-    _speechRec.lang="zh-CN";
-    _speechRec.continuous=true;       // 持续识别（不在静默时自动停止）
-    _speechRec.interimResults=true;   // 中间结果也回调，便于实时回填
-    _speechRec.onresult=function(ev){
-      // 累积已"final"的部分到 _speechFinalText，再拼上当前的 interim 部分
-      var interim="";
-      for(var i=ev.resultIndex;i<ev.results.length;i++){
-        var r=ev.results[i];
-        if(r.isFinal){_speechFinalText+=r[0].transcript;}
-        else{interim+=r[0].transcript;}
-      }
-      var f=document.getElementById("field");if(f)f.value=(_speechFinalText+interim).trim();
-    };
-    _speechRec.onend=function(){
-      // 若用户没主动停止（continuous 在某些浏览器仍会被静默触发结束），自动重启
-      if(!_speechUserStop){
-        try{_speechRec.start();return;}catch(e){}
-      }
-      _speechActive=false;
-      if(btn)btn.classList.remove("listening");
-      fxClose();
-    };
-    _speechRec.onerror=function(ev){
-      // 'no-speech' / 'aborted' 等可恢复错误，且非用户主动停止时重启
-      if(!_speechUserStop&&ev&&(ev.error==="no-speech"||ev.error==="aborted"||ev.error==="audio-capture")){
-        try{_speechRec.start();return;}catch(e){}
-      }
-      _speechActive=false;
-      _speechUserStop=true;
-      if(btn)btn.classList.remove("listening");
-      fxError();
-    };
-  }
-  // 重新开始时清空累积文本（沿用输入框原有内容做基线）
-  _speechUserStop=false;
-  _speechFinalText="";
-  try{_speechRec.start();_speechActive=true;if(btn)btn.classList.add("listening");fxOpen();}
-  catch(e){fxError();showToast("无法启动语音识别");}
-}
+/* ── 语音识别 toggleVoice 已迁移至 src/ui/modals/input.js ── */
+/* ── clearInputField 已迁移至 src/ui/modals/input.js ── */
+
 function openThemeAdvanced(){fxOpen();var body=document.getElementById("theme-adv-body");if(!body)return;body.innerHTML='<div class="adv-color-list">'+ADV_COLOR_KEYS.map(function(k){var cur=getEffectiveColor(k.varName);return'<div class="color-row"><div class="color-row-label">'+k.label+'</div><div class="color-preview-dot" data-var="'+k.varName+'" style="background:'+cur+'" onclick="openColorPicker(\''+k.varName+'\',this)"></div></div>'}).join("")+'</div>';document.getElementById("ov-theme-adv").style.display="flex";function refreshDots(){body.querySelectorAll(".color-preview-dot").forEach(function(dot){var v=dot.getAttribute("data-var");if(v)dot.style.background=getEffectiveColor(v)})}setTimeout(refreshDots,20);setTimeout(refreshDots,120)}
 function closeThemeAdvanced(){closeOv("ov-theme-adv")}
 function resetAllCustomColors(){if(!confirm("重置所有自定义颜色？"))return;settings.customColors={};settings.accent="";settings.accentHue=null;["--acc","--acc-t","--hero-bg","--bg","--card","--card-alt","--nav-bg","--t1","--t2","--t3","--bdr"].forEach(function(v){document.body.style.removeProperty(v)});saveSettings();applyTheme();try{render()}catch(e){}try{if(typeof renderSettings==="function")renderSettings()}catch(e){}openThemeAdvanced();showToast("已全部重置为主题色")}

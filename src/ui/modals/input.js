@@ -212,3 +212,73 @@ export function hideAiSug() {
     if (row) row.style.display = "none";
   }, 180);
 }
+
+// ── 语音识别（Web Speech API） ──────────────────────────────────────────────
+
+let _speechRec = null, _speechActive = false, _speechUserStop = false, _speechFinalText = "";
+
+/**
+ * 切换语音输入开关。与原 inline toggleVoice 行为完全等价。
+ * 依赖 window.fxOpen/fxClose/fxError（inline SFX）、window.showToast（bridged）。
+ */
+export function toggleVoice() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    if (typeof window.fxError === "function") window.fxError();
+    if (typeof window.showToast === "function") window.showToast("当前浏览器不支持语音识别");
+    return;
+  }
+  const btn = byId("micBtn");
+  if (_speechActive) {
+    _speechUserStop = true;
+    if (_speechRec) try { _speechRec.stop(); } catch (e) {}
+    _speechActive = false;
+    if (btn) btn.classList.remove("listening");
+    if (typeof window.fxClose === "function") window.fxClose();
+    return;
+  }
+  if (!_speechRec) {
+    _speechRec = new SR();
+    _speechRec.lang = "zh-CN";
+    _speechRec.continuous = true;
+    _speechRec.interimResults = true;
+    _speechRec.onresult = function (ev) {
+      let interim = "";
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const r = ev.results[i];
+        if (r.isFinal) { _speechFinalText += r[0].transcript; }
+        else { interim += r[0].transcript; }
+      }
+      const f = byId("field");
+      if (f) f.value = (_speechFinalText + interim).trim();
+    };
+    _speechRec.onend = function () {
+      if (!_speechUserStop) {
+        try { _speechRec.start(); return; } catch (e) {}
+      }
+      _speechActive = false;
+      if (btn) btn.classList.remove("listening");
+      if (typeof window.fxClose === "function") window.fxClose();
+    };
+    _speechRec.onerror = function (ev) {
+      if (!_speechUserStop && ev && (ev.error === "no-speech" || ev.error === "aborted" || ev.error === "audio-capture")) {
+        try { _speechRec.start(); return; } catch (e) {}
+      }
+      _speechActive = false;
+      _speechUserStop = true;
+      if (btn) btn.classList.remove("listening");
+      if (typeof window.fxError === "function") window.fxError();
+    };
+  }
+  _speechUserStop = false;
+  _speechFinalText = "";
+  try {
+    _speechRec.start();
+    _speechActive = true;
+    if (btn) btn.classList.add("listening");
+    if (typeof window.fxOpen === "function") window.fxOpen();
+  } catch (e) {
+    if (typeof window.fxError === "function") window.fxError();
+    if (typeof window.showToast === "function") window.showToast("无法启动语音识别");
+  }
+}

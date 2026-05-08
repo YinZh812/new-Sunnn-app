@@ -341,6 +341,9 @@ window.openWheelTimeForTx = wheelTime.openWheelTimeForTx;
 window.inlineEditDesc = mainTab.inlineEditDesc;
 // inlineEditAmt 仍留在 inline（~25 行计算器状态机 + #ov-iamt 弹窗），待手动记账迁移时一并处理
 
+// ── 桥接语音识别 ──────────────────────────────────────────────────────────
+window.toggleVoice = inputModal.toggleVoice;
+
 // ── 桥接 renderAiSug ────────────────────────────────────────────────────────
 window.renderAiSug = inputModal.renderAiSug;
 window.hideAiSug   = inputModal.hideAiSug;
