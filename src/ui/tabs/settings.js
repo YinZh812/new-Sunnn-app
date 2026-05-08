@@ -1008,6 +1008,8 @@ export function openThemeAdvanced() {
 }
 
 export function closeThemeAdvanced() {
+  // 先关闭可能打开的颜色选择器（z-index 更高，会拦截点击）
+  closeColorPicker();
   if (typeof window.closeOv === "function") window.closeOv("ov-theme-adv");
 }
 
