@@ -6,7 +6,7 @@
 
 ## 一句话现状
 
-`index.html` 从 2109 行单文件起步 → 现在 689 行。模块化源码（`src/` 33 个文件）已完整接管 Hero、列表、分析页、设置页、目标页、推荐词、7 个 modal、导航系统、渲染枢纽、输入流、格式帮手、描述内联编辑、WheelTime、**列表滑删/边缘手势**。inline `<script>` 剩余约 330 行：金额内联编辑、类别设置、手动记账、语音识别、高级主题。
+`index.html` 从 2109 行单文件起步 → 现在 629 行。模块化源码（`src/` 33 个文件）已完整接管 Hero、列表、分析页、设置页、目标页、推荐词、7 个 modal、导航系统、渲染枢纽、输入流、格式帮手、描述内联编辑、WheelTime、列表滑删/边缘手势、**手动记账（calc+open+submit）、详情（open+render+edit）、确认（confirm+delete）、颜色帮手**。inline 剩余 ~270 行：金额内联编辑(#ov-iamt)、类别设置(CatSettings)、语音识别(toggleVoice)、高级主题(ColorPicker)、杂项UI。
 
 ---
 
