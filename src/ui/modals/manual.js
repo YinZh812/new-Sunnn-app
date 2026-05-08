@@ -505,7 +505,10 @@ export function submitManual() {
   const descRaw = byId("mcDescInp") ? byId("mcDescInp").value : (byId("mdesc") || {}).value;
   const desc = (descRaw || "").trim() || mCat;
   const dateVal = (byId("mdate") || {}).value;
-  const ts = dateVal ? new Date(dateVal + "T12:00:00").getTime() : Date.now();
+  const now = new Date();
+  const ts = dateVal
+    ? new Date(dateVal + "T" + pad2(now.getHours()) + ":" + pad2(now.getMinutes()) + ":00").getTime()
+    : now.getTime();
 
   const t = {
     amount: amt, currency: mCur, category: mCat, type: mType,
