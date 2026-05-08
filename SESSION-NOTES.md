@@ -6,233 +6,163 @@
 
 ## 一句话现状
 
-`index.html` 从 2109 行单文件起步 → 现在 516 行（**-75.5%**）。模块化源码（`src/` 33 个文件）已完整接管所有核心业务逻辑和 UI 交互。inline `<script>` 剩余约 160 行纯必要基础设施：SFX/VIB/fx*、LUCIDE 图标引擎、全局数据层、类别数据、initSwipe、杂项UI（toggleSavingsPanel/startEditUserName/closeOv/cp/syncCalc/selCM/tryShowDatePicker）、事件监听/auth stub/save wrapper。
+**架构重构已完成（~90%）**。`index.html` 从 2109 行 → 516 行（-75.5%）。33 个模块 ~4700 行，严格三层架构（utils → domain → state → ui）。剩余 ~160 行 inline 是纯基础设施（SFX、图标字典、数据层、事件监听、auth stub）——不是业务逻辑，只是胶水代码。
+
+## 部署
+
+- GitHub Pages：`https://yinzh812.github.io/new-Sunnn-app/`
+- 开发：Cursor Live Server 右键 `index.html`（`file://` 不支持 ES Modules）
+- 推送：`git push` → 等 1 分钟 → 手机刷新（建议无痕模式避缓存）
 
 ---
 
-## 大事记（按时间线）
+## 本轮 Session 完成事项（按顺序）
 
-### 阶段 1：架构骨架（任务 #1-#13）
+### 导航系统迁移
+- `nav.js`：`showTab` 同步 `window.currentTab` 给 inline 残留代码
+- `main.js`：激活 `attachNavClicks()`、`showTab("main")` 首屏渲染
+- `index.html`：删除 `showPage`/`goTab` 函数、移除 nav 按钮 onclick
 
-- 备份归档到 `backups/`
-- 建立 `src/` 三层架构：utils / domain / state / ui
-- 拆 CSS：`<style>` 700 行 → `styles/{base,themes,components}.css`
-- 写 33 个模块文件（约 3800 行）：
-  - `utils/`：dom、format、icons
-  - `domain/`：categories、currency、dates、voice/{dictionary,parser,tests}
-  - `state/`：storage、store（含事件总线）、auth、sync
-  - `ui/components/`：sfx、overlay、swipe、wheel-time、nav、inline-edit
-  - `ui/modals/`：input、confirm、manual、detail、auth、currency-confirm、month-picker、search（**骨架，render 内部 TODO**）
-  - `ui/tabs/`：main、analysis、goals、settings、search（**骨架**）
-  - `main.js`：装配序列、bootstrap、window.acct 暴露
-- index.html 加 `<script type="module" src="src/main.js">`
+### 渲染枢纽迁移
+- `main.js`：`window.render` 桥接——同步 inline 状态到 store + 触发 `mainTab.renderList()`
+- `index.html`：删除 `render()`（含 fallback hero 渲染 35 行）+ `renderList()`（17 行）
+- 初始渲染从 inline `render()` 改为 bootstrap `showTab("main")`
 
-### 阶段 2：渐进迁移（任务 #14-#37）
+### 输入流迁移
+- `input.js`：修正 DOM ID 错误（`#inputField` → `#field`）、补全 `doSend`/`open`/`clearInputField`
+- `main.js`：桥接 `window.doSend`、`openInputSheet`、`chooseCurrency`、`clearInputField`
+- `index.html`：删 `doSend`/`_doSendFinish`/`chooseCurrency`/`openInputSheet`/`parseVoiceText` 等
 
-逐个把 inline `<script>` 里的渲染/工具函数搬到模块版，并通过 `window.X` 桥接覆盖 inline 同名定义，让 inline 的调用自动路由到模块版。
+### 格式帮手清理
+- 删 11 个死函数（`rate`/`netV`/`sumT`/`fmtA`/`fmtLabel`/`dayL`/`groupListLbl`/`listTimInnerText`/`listTimBlockHtml`/`LIST_WK`/`fmtFull`）
+- 保留 `amtC`/`typeL`/`getTopDescs`（当时仍有 inline 调用方）
 
-| 已迁移 | 状态 |
+### 内联编辑迁移
+- `mainTab`：新增 `inlineEditDesc`（列表行就地编辑描述）
+- `main.js`：桥接 `window.inlineEditDesc`
+
+### WheelTime 迁移
+- `wheel-time.js`：新增 `openWheelTimeForTx`（为交易行打开时间选择器）
+- `main.js`：桥接 `openWheelTime`/`closeWheelTime`/`openWheelTimeForTx`/`showToast`
+- `index.html`：删 `InfiniteWheel` 类 + 相关函数（-86 行）
+
+### 列表滑删死代码清理
+- `initListEdgeScroll`（~130 行）+ `bindListRowSwipe`（~36 行）已被模块 `swipe.js` 完全接管
+- 保留 `closeOtherListSwipe`/`resetListSwipeAll`（仍被 `openDetail` 调用）
+- -165 行
+
+### 大规模死代码清理
+- 删除所有已被 `window.*` 桥接覆盖的 inline 函数体：
+  - 手动记账：`mc*`/`openManual`/`submitManual`/`saveDraft`/`restoreDraft` 等
+  - 详情：`openDetail`/`renderDetailBody`/`detailEdit*`/`doEdit`/`doDelete`
+  - 确认：`confirmDelete`/`resetDeleteConfirmRow`/`cancelDeleteConfirm`/`executeDeleteConfirm`
+  - 颜色：`hslToHex`/`hexToHsl`/`contrastText`/`getCurrentAccent`/`getEffectiveColor`/`applyTheme`
+  - 格式：`escTx`/`showToast`/`amtC`/`typeL`/`getTopDescs`
+- -73 行
+
+### 语音识别迁移
+- `input.js`：新增 `toggleVoice`（Web Speech API 持续识别 + 自动重启）
+- `main.js`：桥接 `window.toggleVoice`
+- -53 行
+
+### 大规模模块迁移（最后批次）
+- **Coin 切换**：`toggleDisplayCurrency` → mainTab
+- **高级主题**：`openColorPicker`/`bindLitSlider`/`applyCppLive`/`saveAndRefreshCpp`/`resetCustomColor`/`closeColorPicker` + `openThemeAdvanced`/`closeThemeAdvanced`/`resetAllCustomColors` → settingsTab
+- **类别设置 UI**：`renderCatSettings`/`openCatSettings`/`closeCatSettings`/`editCatIcon`/`openLucidePicker`/`closeLucidePicker`/`deleteCat`/`addNewCat` → settingsTab
+- **预算编辑器**：`addBudgetCat`/`deleteBudgetCat`/`openBudgetCatEditor`/`closeBudgetCatEditor`/`renderBudgetCatEditor`/`addBudgetCatNew` → goalsTab
+- **金额内联编辑**：`inlineEditAmt`/`closeIamt`/`iaInput`/`iaDateChange` → mainTab
+- -59 行（575→516）
+
+### Bug 修复
+
+**致命 SyntaxError（移动端全部功能失效）：**
+- 原因：`index.html` 第 414 行注释内 `detailEdit*/doEdit` 中的 `*/` 提前关闭了 `/*`，导致 `已迁移至` 被当 JS 解析
+- 症状：inline 脚本完全罢工 → `closeOv`/`saveTxs` 等都未定义 → 手动记账无反应、高级主题卡死
+- 修复：改为 `detailEdit( Cat|Type|Cur )` 避免 `*/` 出现在注释中
+
+**手动记账时间优化：**
+- `manual.js`：`timePrecision` 从 `"day"` 改为 `"exact"` → 列表显示时刻
+- `manual.js`：时间戳从硬编码 `T12:00:00` 改为动态 `当前时:分`
+- 结果：新建交易默认显示实际时间而非 12:00
+
+### 安全讨论
+- 前端代码在浏览器中天然可见，模块化不改变这一点
+- Supabase anon key 设计上就是公开的，安全靠 RLS 策略
+- 语音解析规则（`parser.js` + `dictionary.js`）可通过 F12 查看
+- 暂不迁移 Edge Function（会增加延迟，不值得）
+
+---
+
+## 当前文件统计
+
+```
+index.html      516 行  入口 + ~160 行基础设施
+styles/
+  base.css       38 行
+  themes.css     77 行
+  components.css 587 行
+src/           7394 行  33 个 JS 模块
+  main.js       473 行  装配序列 + 桥接层
+  utils/        233 行  dom / format / icons
+  domain/       714 行  categories / currency / dates / voice/{dict,parser,tests}
+  state/        808 行  storage / store / auth / sync
+  ui/components/ 843 行  sfx / overlay / swipe / wheel-time / nav / inline-edit
+  ui/modals/   1929 行  input / confirm / manual / detail / auth / currency-confirm / month-picker / search
+  ui/tabs/     2291 行  main / analysis / goals / settings / search
+```
+
+---
+
+## inline 剩余（~160 行，不再计划迁移）
+
+| 区域 | 性质 |
 |---|---|
-| Hero 渲染（`mainTab.renderHero`） | ✅ |
-| 8 个纯帮手 `pad/escTx/fmtA/fmtLabel/fmtFull/groupListLbl/listTimInnerText/dayL` | ✅ |
-| 金额计算 `rate/netV/sumT`（`netInEur/sumByTypeInEur` 模块版） | ✅ |
-| 数据持久化同步：hook `saveTxs/saveSettings` → store 自动同步 | ✅ |
-| 主题应用 `applyTheme` 桥接到 `settingsTab.applyTheme` | ✅ |
-| 列表渲染 `mainTab.renderList`（按日分组、左滑删除、内联编辑入口） | ✅ |
-| 分析页 `analysisTab.render` + `setAnalysisTab`（饼图/排行/预算/目标） | ✅ |
-| voice 测试用例 11/11 通过（kevin 边界已标 known） | ✅ |
-| 设置页 `renderSettings` + 全部 helpers（主题/货币/音效/清理/导出/导入） | ✅ |
-| 反向同步 store → window.settings/txs（模块改数据 inline 也能读到） | ✅ |
-| 颜色帮手桥接 `hslToHex/contrastText/hexToHsl/getCurrentAccent/getEffectiveColor` | ✅ |
-| 目标页 `renderGoals` + setBudget/addGoal/deleteGoal/getBudgetCatList | ✅ |
-| 反向同步扩展 budgets/goals → window.budgets/goals | ✅ |
-| 推荐词 `renderAiSug` + hideAiSug + getTopDescs/truncateSug/deleteSug | ✅ |
-| 确认弹窗 `confirm` modal 完整实现（showConfirm/renderConfirmSingle/Multi/confEdit*/doConfirm/showAmtPrompt/showErr） | ✅ |
-| input.js `_afterParse` 补齐 needAmountInput/showErr 分流逻辑 | ✅ |
-| 手动记账 `manual` modal 完整实现（open/计算器/类型tab/类别行/货币pill/日期/草稿/推荐词/submitManual） | ✅ |
-| 交易详情 `detail` modal 完整实现（renderDetailBody/行内编辑类别网格·类型循环·货币切换/doEdit→manual/doDelete→删除确认） | ✅ |
-| 月份选择 `month-picker` modal 完整实现（open/render年月网格/toggleYM/pickerNav/selYear/selMonth + has-data标记） | ✅ |
-| 搜索弹窗 `search` modal 完整实现（openSearchSheet/doSearchSheet → 类别图标+时间块+按ts降序+点击→详情） | ✅ |
-| 登录弹窗 `auth` modal 桥接完成（openAuthSheet/doSignIn/doSignUp/doSignOut/doSignInWithGoogle/showForgotPasswordPrompt/doUpdatePassword/doManualSync） | ✅ |
-
-### 顺手修的 bug
-
-1. inline `closePopOnOut is not defined` 死代码 → 已修
-2. inline `escTx` 没转义 `>` 和 `'`（XSS 隐患）→ 模块版 `escapeHtml` 修了
-3. inline `setRate` 改汇率后**没调 render**（hero 不更新）→ saveSettings hook 后 emit 自动触发 `renderHero`
+| `SFX`/`VIB` + `fx*` 函数 | 全局音效层，模块 `sfx.js` 有重复实现，inline 版是 `window.*` 访问入口 |
+| `LUCIDE` 字典 + `lucideSvg`/`renderIconValue` | 图标引擎 |
+| `CAT_LIST`/`THEMES`/`ACCENT_COLORS` + `ADV_COLOR_KEYS` | 静态配置数据 |
+| `txs`/`settings`/`budgets`/`goals`/`viewYear`/`viewMonth`/`currentTab` 等 | 全局状态变量，被 `hookInlineSaves` 双向同步 |
+| `pad`/`lsGet`/`lsSet`/`loadAll`/`save*` | 数据持久化层 |
+| `DEFAULT_CATS_BY_TYPE`/`customCategories*`/`loadCustomCategories`/`getCatIcon` 等 | 类别系统数据 |
+| `initSwipe` | 弹窗下划手势（启动时绑定 6 个 sheet） |
+| `closeOtherListSwipe`/`resetListSwipeAll` | 列表滑删残留 helper |
+| `closeOv` | 弹窗关闭入口（被 HTML onclick 调用） |
+| `toggleSavingsPanel`/`startEditUserName`/`cp`/`syncCalc`/`selCM`/`tryShowDatePicker` | 杂项 UI |
+| 启动事件监听 + `closeAllPopups`/`cppOutsideClick` | document 级 click handler |
+| auth stubs + save 包装层 | `id`/`updatedAt` 时间戳逻辑 |
 
 ---
 
-## 已知行为（不要误判为 bug）
+## 语音解析规则修改
 
-### Hero 货币切换 ≠ 列表币种切换
+需要改解析规则时，只改这两个文件：
 
-Hero 顶部的 `€/¥` 按钮只切换 `settings.displayCurrency`，影响 **Hero 总额**（欧元×汇率显示为人民币）。**列表里每行交易仍按 `tx.currency` 原币种显示**。所以 Hero 总额跟列表行加和**故意不逐字相等**。
+| 文件 | 内容 |
+|---|---|
+| `src/domain/voice/parser.js` | 分词逻辑、金额提取、类别匹配、关键词规则 |
+| `src/domain/voice/dictionary.js` | 中文数字词典 |
 
-### "最后" 是多笔切分关键词
-
-`voiceSplitInput` 把 `"最后"` 当强分隔词，支持 `"今天加油，最后买了 kebab"` 这种多笔模式。代价是 `"kevin赌我最后一球不进 100rmb"` 会被误切，amount/type 识别失败。已在 `tests.js` 标 `knownEdge: true`。
-
-### Multiple GoTrueClient 警告
-
-inline 与模块的 auth.js 各创建了一个 Supabase client。两者共享同一份 session storage，行为一致。**等下一波迁移 auth/sync 后这条警告会消失。**
+改完后浏览器控制台跑 `runVoiceTests()` 验证回归。
 
 ---
 
-## 下一步要做的事
-
-### 高优先级（按建议顺序）
-
-1. ~~**`renderSettings` 迁移**~~ ✅ 已完成
-   - `src/ui/tabs/settings.js`：完整 render() + 全部 action handlers + 导出/导入/清理
-   - 桥接 15 个 window 函数（renderSettings/setTheme/setAccent/setDefCur/setRate/setSfxEnabled/setSfxVolume/setVibEnabled/cleanupTxs/setExportRange/doExportRange/onImportFile/confirmImport/bindHueSlider + 5 个颜色帮手）
-   - 新增反向同步：store → window.settings/txs
-   - 高级颜色自定义（openThemeAdvanced/openColorPicker/closeColorPicker 等）仍留在 inline，通过 window 全局与模块版颜色帮手交互
-
-2. ~~**`renderGoals` 迁移**~~ ✅ 已完成
-   - `src/ui/tabs/goals.js`：完整 render() + getBudgetCatList + setBudget/addGoal/deleteGoal
-   - 桥接 5 个 window 函数 + budgets/goals 反向同步
-   - openBudgetCatEditor/closeBudgetCatEditor/renderBudgetCatEditor 仍留在 inline
-
-3. ~~**`renderAiSug` 迁移**~~ ✅ 已完成
-   - `src/ui/modals/input.js`：renderAiSug + hideAiSug + getTopDescs/truncateSug/deleteSug
-   - 桥接 `window.renderAiSug` / `window.hideAiSug`
-
-### 中优先级（modal 实质化）
-
-骨架已就位，但内部 render/逻辑都是 TODO：
-
-| Modal | 复杂度 | 关键内容 |
-|---|---|---|
-| ~~`confirm`（确认弹窗）~~ | ✅ 已完成 | 单笔/多笔渲染 + 内联编辑（金额/描述/类别/类型/货币）+ showAmtPrompt + showErr |
-| ~~`manual`（手动记账）~~ | ✅ 已完成 | 计算器状态机、类型 tab、类别行、货币 pill、日期选择、草稿暂存、推荐词、提交/编辑 |
-| ~~`detail`（交易详情）~~ | ✅ 已完成 | 完整字段展示 + 行内编辑（类别网格/类型循环/货币切换）+ 删除确认流程 |
-| ~~`month-picker`（月份选择）~~ | ✅ 已完成 | 年/月网格 + has-data 标记 + 年份十年区间视图 |
-| ~~`search`（搜索）~~ | ✅ 已完成 | 实时过滤 + 类别图标 + 时间块 + 按 ts 降序 + 点击→详情 |
-| `currency-confirm`（货币冲突）| 极低 | 已基本完成，可能不需要再迁 |
-| ~~`auth`（登录）~~ | ✅ 已完成 | 三模式切换 + 邮密/Google OAuth/忘记密码/重置密码/手动同步/退出 |
-
-### 低优先级（清理收尾）
-
-4. ~~**删 inline 的 Supabase client**（消除 GoTrueClient 警告）~~ ✅ 已完成
-   - 删除 ~288 行：inline Supabase client 创建、auth 函数、sync 层（cloudPull/cloudPush）、`_initAuth` 启动
-   - 保留 auth stubs（openAuthSheet/doSignIn 等空函数，模块桥接会覆盖）
-   - 保留 saveTxs id/updatedAt 包装（兼容模块 sync 的 last-write-wins）
-   - GoTrueClient 多实例警告已消除
-5. ~~**删 inline 的死代码**~~ ✅ 已完成（第一轮）
-   - 删除 143 行（16 个代码块），净减 127 行：1137 → 1010 行
-   - 已删：语音解析（cnNumToInt…splitInput）、renderAiSug/hideAiSug/truncateSug、
-     确认弹窗全部（showAmtPrompt…doConfirm）、分析页全部（renderAnalysis/setAnalysisTab/totalSavings）、
-     搜索页 doSearch、目标页（renderGoals/getBudgetCatList/addGoal/deleteGoal/setBudget）、
-     设置页核心（renderSettings/setTheme/setAccent/setDefCur/setSfx*/setVibEnabled/cleanupTxs/setExportRange/doExportRange/setRate）、
-     导入功能全部、搜索弹窗 inline 版、bindHueSlider、月份选择器全部、
-     selType/selCur/selCat/buildCatGrid/showManualSug/deleteSug
-   - 保留：render/renderList（首屏）、格式帮手、InfiniteWheel/WheelTime、
-     内联编辑（inlineEditDesc/Amt）、列表滑删、类别设置、语音识别（toggleVoice）、
-     高级主题自定义、nav（showPage/goTab）、输入流（doSend/_doSendFinish）、
-     预算类别编辑器、下载/导入帮手函数
-   - 未删手动记账函数（selTypeTab/syncTypeTabs/mcInput 等），因与类别设置共享状态，留给第二轮
-6. ~~**激活模块的 `attachNavClicks` 与 `showTab`**~~ ✅ 已完成
-   - `src/ui/components/nav.js`：showTab 内同步 `window.currentTab`
-   - `src/main.js`：激活 attachNavClicks、showTab("main") 首屏、window.showPage/window.render 桥接
-   - `index.html`：删除 showPage/goTab 函数、render/renderList 函数、移除 nav onclick 属性
-   - 删 render/renderList 约 53 行，inline 从 1008 → 959 行
-7. ~~**继续清理 inline 死代码**~~ ✅ 已完成
-   - 删手动记账 mc*/openManual/submitManual/saveDraft/restoreDraft 等
-   - 删详情 openDetail/renderDetailBody/detailEdit*/doEdit/doDelete
-   - 删确认 confirmDelete/resetDeleteConfirmRow/cancelDeleteConfirm/executeDeleteConfirm
-   - 删颜色 hslToHex/hexToHsl/contrastText/getCurrentAccent/getEffectiveColor/applyTheme
-   - 删格式 escTx/showToast/amtC/typeL/getTopDescs
-   - 删类别切换 selTypeTab/selCurPill/buildManualCatRow 等
-   - 迁语音识别 toggleVoice → input.js
-   - 删 downloadBlob
-   - 689→575（本轮 session 净减 114 行）
-
----
-
-## 渐进迁移操作手册（每次开 session 用）
-
-### 准备
-
-1. Cursor 装 Live Server 插件
-2. 右键 `index.html` → Open with Live Server
-3. 浏览器打开后开 DevTools 控制台
-
-### 迁移单步（以 renderXxx 为例）
+## Git 提交历史
 
 ```
-① 摸底：grep inline 函数定义与依赖
-   grep -n "^function renderXxx" index.html
-   grep -n "renderXxx(" index.html  # 调用方
-
-② 设计：列出依赖（store / domain / utils / 其他 inline 全局）
-   决定哪些需要新增模块函数、哪些直接桥接
-
-③ 实现：
-   - 必要的 domain/utils 模块函数（纯函数优先）
-   - 模块版 ui/tabs/xxx.js 或 ui/modals/xxx.js 的 render 实现
-   - main.js 加 import + 桥接 window.renderXxx = xxxTab.render
-
-④ 静态验证：grep 桥接行 + CSS 类名存在 + 依赖 import 都已解析
-
-⑤ 浏览器实测：
-   - 控制台：window.renderXxx === window.acct.tabs.xxxTab.render → true
-   - 视觉：跟之前像素一致
-   - 操作：相关交互（点击/切换）都正常
-
-⑥ 提交（git add + commit）
+8f2560e 完成全部剩余 inline 函数的模块迁移（-59 行，575→516）
+f62e4c6 完成全部 inline 清理：语音识别迁移 + 文档更新
+3a43759 迁移语音识别 toggleVoice 到 input.js 模块
+93b582a 大规模清理已桥接的死 inline 函数体（-73 行）
+0c516d7 清理死 inline 列表滑删/边缘手势（-165 行，854→689）
+765c41c 迁移 WheelTime 滚轮时间选择器（-86 行，940→854）
+593d24c 迁移 inlineEditDesc 到 mainTab 模块
+4059c2c 清理 11 个死 inline 格式帮手
+f616c97 迁移输入流 doSend/_doSendFinish 到模块 input.js
+b7c6671 重写 README.md
+7f1a27f 迁移 nav 导航 + render/renderList 枢纽
+6dc024b 初始提交：模块化架构 + 导航迁移完成
+(后续)  修复 SyntaxError + manual timePrecision 改动
 ```
 
-### 关键控制台命令
+## 开新 session 第一句话
 
-```js
-// 桥接是否成功
-[window.renderHero === window.acct.tabs.mainTab.renderHero,
- window.renderList === window.acct.tabs.mainTab.renderList,
- window.renderAnalysis === window.acct.tabs.analysisTab.render]
-
-// store 状态查看
-window.acct.store.getTxs().length
-window.acct.store.getSettings()
-window.acct.store.getBudgets()
-
-// voice 解析回归测试
-runVoiceTests()
-// 期待：{ passed: 11, total: 11, knownEdge: 1 }
-```
-
----
-
-## 数字盘点
-
-- `index.html`：原 2109 行 → 现在 1010 行（CSS 抽离 700 行 + Supabase 288 行 + 死代码 127 行）
-- inline `<script>` 仍剩约 680 行（render/renderList、格式帮手、内联编辑、WheelTime、类别设置、手动记账变量/函数、语音识别、theme 高级自定义、输入流、nav、列表滑删）
-- `src/`：33 个模块约 4000 行（含丰富 JSDoc 与渐进迁移说明）
-- `styles/`：base.css(38) + themes.css(77) + components.css(587) = 702 行
-
----
-
-## 待办（行政事项）
-
-- [ ] **手动删除** `_TO-DELETE/` 目录（sandbox 没权限直接 rm，请你 shift+del）
-- [ ] 考虑把 git 仓库初始化（如果还没的话），方便后续每次迁移有 commit 节点可回滚
-
----
-
-## 维护者声明
-
-模块层依赖方向严格自底向上：
-
-```
-utils/        ← 任何层都可依赖
-domain/       ← 仅依赖 utils
-state/        ← 依赖 domain + utils
-ui/           ← 依赖 state + domain + utils + ui/components
-main.js       ← 装配所有层
-```
-
-**严禁反向依赖**：state 不能动 DOM；domain 不能读 localStorage；ui 不能直接读 storage。
-
-**严禁新增全局 var**：所有可变状态进 store。
-
-更详细见 `src/ARCHITECTURE.md`。
+> 先读 SESSION-NOTES.md 和 src/ARCHITECTURE.md，然后继续推进 [具体目标]。
