@@ -133,3 +133,142 @@ export function deleteGoal(i) {
   store.setGoals(goals);
   render();
 }
+
+// ── 预算类别编辑器 ──────────────────────────────────────────────────────────
+
+export function addBudgetCat() {
+  const name = (prompt("新类别名称：") || "").trim();
+  if (!name) return;
+  if (window.budgets[name] !== undefined) {
+    if (typeof window.showToast === "function") window.showToast("该类别已存在");
+    return;
+  }
+  window.budgets[name] = 0;
+  if (typeof window.saveBudgets === "function") window.saveBudgets();
+  render();
+  if (typeof window.fxTap === "function") window.fxTap();
+}
+
+export function deleteBudgetCat(c) {
+  if (!confirm("删除「" + c + "」预算？")) return;
+  delete window.budgets[c];
+  if (window.settings.budgetCatOrder) {
+    window.settings.budgetCatOrder = window.settings.budgetCatOrder.filter((x) => x !== c);
+    if (typeof window.saveSettings === "function") window.saveSettings();
+  }
+  if (typeof window.saveBudgets === "function") window.saveBudgets();
+  render();
+  if (typeof window.fxDelete === "function") window.fxDelete();
+  if (typeof window.showToast === "function") window.showToast("已删除");
+}
+
+export function openBudgetCatEditor() {
+  if (typeof window.fxOpen === "function") window.fxOpen();
+  const list = (typeof window.getBudgetCatList === "function" ? window.getBudgetCatList() : []);
+  if (!window.settings.budgetCatOrder) window.settings.budgetCatOrder = list.slice();
+  document.getElementById("ov-bcat-edit").style.display = "flex";
+  renderBudgetCatEditor();
+}
+
+export function closeBudgetCatEditor() {
+  if (typeof window.saveSettings === "function") window.saveSettings();
+  render();
+  document.getElementById("ov-bcat-edit").style.display = "none";
+  if (typeof window.fxClose === "function") window.fxClose();
+}
+
+export function renderBudgetCatEditor() {
+  const listEl = document.getElementById("bcatEditList");
+  if (!listEl) return;
+  listEl.innerHTML = "";
+  const order = window.settings.budgetCatOrder || [];
+  order.forEach(function (c, i) {
+    const r = document.createElement("div");
+    r.className = "bcat-row";
+    r.setAttribute("data-i", i);
+    r.setAttribute("draggable", "true");
+    const ico = document.createElement("div");
+    ico.className = "bcat-row-ico";
+    ico.innerHTML = (typeof window.getCatIcon === "function" ? window.getCatIcon(c) : "") || (window.CAT_ICO && window.CAT_ICO[c]) || "📦";
+    const nm = document.createElement("div");
+    nm.className = "bcat-row-name";
+    nm.textContent = c;
+    const del = document.createElement("div");
+    del.className = "bcat-row-del";
+    del.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+    del.title = "删除";
+    del.onclick = function (e) {
+      e.stopPropagation();
+      if (!confirm("删除「" + c + "」预算？")) return;
+      delete window.budgets[c];
+      window.settings.budgetCatOrder.splice(i, 1);
+      if (typeof window.saveBudgets === "function") window.saveBudgets();
+      if (typeof window.saveSettings === "function") window.saveSettings();
+      renderBudgetCatEditor();
+      if (typeof window.fxDelete === "function") window.fxDelete();
+    };
+    const drag = document.createElement("div");
+    drag.className = "bcat-row-drag";
+    drag.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/></svg>';
+    r.appendChild(ico);
+    r.appendChild(nm);
+    r.appendChild(del);
+    r.appendChild(drag);
+    r.addEventListener("dragstart", function (e) {
+      e.dataTransfer.setData("text/plain", String(i));
+      r.classList.add("dragging");
+    });
+    r.addEventListener("dragend", function () { r.classList.remove("dragging"); });
+    r.addEventListener("dragover", function (e) { e.preventDefault(); });
+    r.addEventListener("drop", function (e) {
+      e.preventDefault();
+      const src = parseInt(e.dataTransfer.getData("text/plain"));
+      const dst = i;
+      if (src === dst || isNaN(src)) return;
+      const arr = window.settings.budgetCatOrder;
+      const moved = arr.splice(src, 1)[0];
+      arr.splice(dst, 0, moved);
+      if (typeof window.saveSettings === "function") window.saveSettings();
+      renderBudgetCatEditor();
+    });
+    drag.addEventListener("touchstart", function (e) {
+      e.preventDefault();
+      r.classList.add("dragging");
+    }, { passive: false });
+    drag.addEventListener("touchmove", function (e) {
+      e.preventDefault();
+      const y = e.touches[0].clientY;
+      let el = document.elementFromPoint(e.touches[0].clientX, y);
+      while (el && !el.classList.contains("bcat-row")) el = el.parentNode;
+      if (!el || el === r) return;
+      const ti = parseInt(el.getAttribute("data-i"));
+      if (isNaN(ti)) return;
+      const arr = window.settings.budgetCatOrder;
+      const moved = arr.splice(i, 1)[0];
+      arr.splice(ti, 0, moved);
+      if (typeof window.saveSettings === "function") window.saveSettings();
+      renderBudgetCatEditor();
+    }, { passive: false });
+    drag.addEventListener("touchend", function () { r.classList.remove("dragging"); });
+    listEl.appendChild(r);
+  });
+  if (!order.length) {
+    listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--t3);font-size:12px">暂无类别，点右上 + 添加</div>';
+  }
+}
+
+export function addBudgetCatNew() {
+  const name = (prompt("新类别名称：") || "").trim();
+  if (!name) return;
+  if (!window.settings.budgetCatOrder) {
+    window.settings.budgetCatOrder = (typeof window.getBudgetCatList === "function" ? window.getBudgetCatList() : []);
+  }
+  if (window.settings.budgetCatOrder.indexOf(name) >= 0) {
+    if (typeof window.showToast === "function") window.showToast("已存在");
+    return;
+  }
+  window.settings.budgetCatOrder.push(name);
+  if (typeof window.saveSettings === "function") window.saveSettings();
+  renderBudgetCatEditor();
+  if (typeof window.fxTap === "function") window.fxTap();
+}

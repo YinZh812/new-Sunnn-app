@@ -6,7 +6,7 @@
 
 ## 一句话现状
 
-`index.html` 从 2109 行单文件起步 → 现在 575 行（**-72.7%**）。模块化源码（`src/` 33 个文件）已完整接管所有核心业务逻辑。inline `<script>` 剩余约 220 行纯必要基础设施：SFX/VIB/fx*、LUCIDE 图标引擎、全局数据层、类别数据、initSwipe、高级主题 ColorPicker、类别设置 UI、预算编辑器、杂项UI（toggleDisplayCurrency/toggleSavingsPanel/startEditUserName/closeOv/cp/selCM/事件监听/auth stub/save wrapper）。
+`index.html` 从 2109 行单文件起步 → 现在 516 行（**-75.5%**）。模块化源码（`src/` 33 个文件）已完整接管所有核心业务逻辑和 UI 交互。inline `<script>` 剩余约 160 行纯必要基础设施：SFX/VIB/fx*、LUCIDE 图标引擎、全局数据层、类别数据、initSwipe、杂项UI（toggleSavingsPanel/startEditUserName/closeOv/cp/syncCalc/selCM/tryShowDatePicker）、事件监听/auth stub/save wrapper。
 
 ---
 

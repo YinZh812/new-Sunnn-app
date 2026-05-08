@@ -12,11 +12,11 @@
 
 | 指标 | 重构前 | 当前 |
 |---|---|---|
-| `index.html` 行数 | 2109 | 575 |
-| inline `<script>` 行数 | ~1400 | ~220 |
+| `index.html` 行数 | 2109 | 516 |
+| inline `<script>` 行数 | ~1400 | ~160 |
 | CSS 位置 | `<style>` 700 行内联 | `styles/` 3 文件 702 行 |
-| JS 模块 | 0 | `src/` 33 文件 ~4300 行 |
-| Git | 无 | 10 commits |
+| JS 模块 | 0 | `src/` 33 文件 ~4700 行 |
+| Git | 无 | 11 commits |
 
 ### Phase 1：架构骨架（2026-05）
 
@@ -64,6 +64,11 @@
 | 28 | **列表滑删**：删死 initListEdgeScroll/bindListRowSwipe（已由 swipe.js 完全接管）| ✅ | index.html |
 | 29 | **大规模死代码清理**：删所有已桥接的 manual/detail/confirm/颜色/格式/类别切换 inline 体 | ✅ | index.html |
 | 30 | **语音识别**：`toggleVoice` → input.js 模块 | ✅ | input.js, main.js, index.html |
+| 31 | **币种切换**：`toggleDisplayCurrency` → mainTab | ✅ | main.js, index.html |
+| 32 | **高级主题 ColorPicker**：openColorPicker/bindLitSlider/applyCppLive 等 + openThemeAdvanced/resetAllCustomColors → settingsTab | ✅ | settings.js, main.js, index.html |
+| 33 | **类别设置 UI**：renderCatSettings/openCatSettings/editCatIcon/openLucidePicker 等 → settingsTab | ✅ | settings.js, main.js, index.html |
+| 34 | **预算编辑器**：addBudgetCat/deleteBudgetCat/openBudgetCatEditor/renderBudgetCatEditor 等 → goalsTab | ✅ | goals.js, main.js, index.html |
+| 35 | **金额内联编辑**：inlineEditAmt/closeIamt/iaInput/iaDateChange → mainTab | ✅ | main.js, index.html |
 
 ---
 
@@ -165,22 +170,20 @@ inline <script> 同步执行           module <script type="module"> deferred
 
 ---
 
-## inline `<script>` 剩余（~220 行，纯基础设施）
+## inline `<script>` 剩余（~160 行，纯基础设施）
 
 | 区域 | 说明 |
 |---|---|
-| SFX/VIB/fx* | 音效+震动全局函数，被所有模块通过 window.* 调用 |
+| SFX/VIB/fx* | 音效+震动全局函数 |
 | LUCIDE 图标引擎 + lucideSvg/renderIconValue | SVG 图标渲染 |
 | CAT_LIST/THEMES/ACCENT_COLORS | 静态配置数据 |
 | 全局状态变量 (txs/settings/...) | 被 hookInlineSaves 同步 |
 | pad/ls*/loadAll/save* | 数据持久化层 |
-| initSwipe | 弹窗下划关闭手势（启动时绑定） |
-| ADV_COLOR_KEYS + 高级主题 | openColorPicker/bindLitSlider 等（~15 行） |
-| 类别设置 UI | renderCatSettings/openCatSettings 等（~25 行） |
-| 金额内联编辑 | inlineEditAmt + 计算器（~22 行，#ov-iamt 弹窗） |
-| 预算编辑器 | renderBudgetCatEditor 等（~15 行） |
-| 杂项 UI | toggleDisplayCurrency/toggleSavingsPanel/startEditUserName/closeOv/cp/selCM（~10 行） |
-| 事件监听 + auth stub + save wrapper | 启动序列（~40 行） |
+| ADV_COLOR_KEYS | 高级颜色配置 |
+| DEFAULT_CATS_BY_TYPE + 类别系统 | 类别数据 + loadCustomCategories/getCatIcon 等 |
+| initSwipe | 弹窗下划关闭手势 |
+| 杂项 UI | toggleSavingsPanel/startEditUserName/closeOv/cp/syncCalc/selCM/tryShowDatePicker（~10 行） |
+| 事件监听 + auth stub + save wrapper | 启动序列（~30 行） |
 
 ---
 

@@ -849,6 +849,353 @@ export function bindHueSlider(sliderId, thumbId, onMove, onEnd) {
   document.addEventListener("mouseup", up);
 }
 
+// ── 高级颜色自定义（ColorPicker） ─────────────────────────────────────────────
+
+let _cppCurVar = null, _cppCurHue = 0, _cppCurLit = 50;
+
+export function openColorPicker(varName, anchor) {
+  if (typeof window.fxOpen === "function") window.fxOpen();
+  _cppCurVar = varName;
+  const cur = getEffectiveColor(varName);
+  const hsl = hexToHsl(cur);
+  _cppCurHue = hsl.h;
+  _cppCurLit = hsl.l;
+  const p = document.getElementById("colorPickerPanel");
+  if (!p) return;
+  const lbl = ADV_COLOR_KEYS.filter((k) => k.varName === varName)[0];
+  document.getElementById("cppTitle").textContent = "选择颜色 · " + (lbl ? lbl.label : varName);
+  document.getElementById("cppHueThumb").style.left = (_cppCurHue / 360 * 100) + "%";
+  document.getElementById("cppHueThumb").style.background = cur;
+  document.getElementById("cppLitThumb").style.left = _cppCurLit + "%";
+  document.getElementById("cppHex").textContent = cur.toUpperCase();
+  p.classList.add("open");
+  const bd = document.getElementById("colorPickerBackdrop");
+  if (bd) bd.classList.add("open");
+  bindHueSlider("cppHue", "cppHueThumb", (h) => { _cppCurHue = h; applyCppLive(); }, () => { saveAndRefreshCpp(); });
+  bindLitSlider();
+}
+
+export function bindLitSlider() {
+  const sl = document.getElementById("cppLit");
+  if (!sl || sl._bound) return;
+  sl._bound = true;
+  let dragging = false;
+  function pos(clientX) {
+    const r = sl.getBoundingClientRect();
+    const x = Math.max(0, Math.min(r.width, clientX - r.left));
+    const pct = x / r.width;
+    _cppCurLit = Math.round(pct * 100);
+    document.getElementById("cppLitThumb").style.left = (pct * 100) + "%";
+    applyCppLive();
+  }
+  function down(e) {
+    dragging = true;
+    const t = e.touches ? e.touches[0] : e;
+    pos(t.clientX);
+    if (e.cancelable) e.preventDefault();
+  }
+  function move(e) {
+    if (!dragging) return;
+    const t = e.touches ? e.touches[0] : e;
+    pos(t.clientX);
+    if (e.cancelable) e.preventDefault();
+  }
+  function up() {
+    if (!dragging) return;
+    dragging = false;
+    saveAndRefreshCpp();
+  }
+  sl.addEventListener("touchstart", down, { passive: false });
+  sl.addEventListener("touchmove", move, { passive: false });
+  sl.addEventListener("touchend", up);
+  sl.addEventListener("mousedown", down);
+  document.addEventListener("mousemove", move);
+  document.addEventListener("mouseup", up);
+}
+
+export function applyCppLive() {
+  if (!_cppCurVar) return;
+  const hex = hslToHex(_cppCurHue, 80, _cppCurLit);
+  document.body.style.setProperty(_cppCurVar, hex);
+  if (_cppCurVar === "--acc") document.body.style.setProperty("--acc-t", contrastText(hex));
+  const hx = document.getElementById("cppHex");
+  if (hx) hx.textContent = hex.toUpperCase();
+  const th = document.getElementById("cppHueThumb");
+  if (th) th.style.background = hex;
+  document.querySelectorAll('.color-preview-dot[data-var="' + _cppCurVar + '"]').forEach((dot) => { dot.style.background = hex; });
+}
+
+export function saveAndRefreshCpp() {
+  if (!_cppCurVar) return;
+  const hex = hslToHex(_cppCurHue, 80, _cppCurLit);
+  const settings = store.getSettings();
+  if (!settings.customColors) settings.customColors = {};
+  settings.customColors[_cppCurVar] = hex;
+  store.setSettings(settings);
+  document.querySelectorAll("#settings-body .color-row").forEach((row) => {
+    const dot = row.querySelector(".color-preview-dot");
+    const lbl = row.querySelector(".color-row-label");
+    if (!dot || !lbl) return;
+    const key = ADV_COLOR_KEYS.filter((k) => k.label === lbl.textContent)[0];
+    if (key) dot.style.background = getEffectiveColor(key.varName);
+  });
+  document.querySelectorAll('#theme-adv-body .color-preview-dot').forEach((dot) => {
+    const v = dot.getAttribute("data-var");
+    if (v) dot.style.background = getEffectiveColor(v);
+  });
+}
+
+export function resetCustomColor() {
+  if (!_cppCurVar) return;
+  const savedVar = _cppCurVar;
+  const settings = store.getSettings();
+  if (settings.customColors && settings.customColors[savedVar]) {
+    delete settings.customColors[savedVar];
+  }
+  if (savedVar === "--acc") {
+    settings.accent = "";
+    settings.accentHue = null;
+  }
+  document.body.style.removeProperty(savedVar);
+  if (savedVar === "--acc") document.body.style.removeProperty("--acc-t");
+  store.setSettings(settings);
+  if (typeof window.applyTheme === "function") window.applyTheme();
+  document.querySelectorAll('.color-preview-dot[data-var="' + savedVar + '"]').forEach((dot) => {
+    dot.style.background = getEffectiveColor(savedVar);
+  });
+  document.querySelectorAll("#settings-body .color-row").forEach((row) => {
+    const dot = row.querySelector(".color-preview-dot");
+    const lbl = row.querySelector(".color-row-label");
+    if (!dot || !lbl) return;
+    const key = ADV_COLOR_KEYS.filter((k) => k.label === lbl.textContent)[0];
+    if (key && key.varName === savedVar) dot.style.background = getEffectiveColor(savedVar);
+  });
+  let anchor = null;
+  document.querySelectorAll('.color-preview-dot[data-var="' + savedVar + '"]').forEach((dot) => {
+    if (!anchor) anchor = dot;
+  });
+  if (anchor) openColorPicker(savedVar, anchor);
+  if (typeof window.showToast === "function") window.showToast("已重置");
+}
+
+export function closeColorPicker() {
+  const p = document.getElementById("colorPickerPanel");
+  if (p) p.classList.remove("open");
+  const bd = document.getElementById("colorPickerBackdrop");
+  if (bd) bd.classList.remove("open");
+  _cppCurVar = null;
+}
+
+// ── 高级主题面板 ────────────────────────────────────────────────────────────
+
+export function openThemeAdvanced() {
+  if (typeof window.fxOpen === "function") window.fxOpen();
+  const body = document.getElementById("theme-adv-body");
+  if (!body) return;
+  body.innerHTML = '<div class="adv-color-list">' + ADV_COLOR_KEYS.map((k) => {
+    const cur = getEffectiveColor(k.varName);
+    return '<div class="color-row"><div class="color-row-label">' + k.label + '</div><div class="color-preview-dot" data-var="' + k.varName + '" style="background:' + cur + '" onclick="openColorPicker(\'' + k.varName + '\',this)"></div></div>';
+  }).join("") + '</div>';
+  document.getElementById("ov-theme-adv").style.display = "flex";
+  function refreshDots() {
+    body.querySelectorAll(".color-preview-dot").forEach((dot) => {
+      const v = dot.getAttribute("data-var");
+      if (v) dot.style.background = getEffectiveColor(v);
+    });
+  }
+  setTimeout(refreshDots, 20);
+  setTimeout(refreshDots, 120);
+}
+
+export function closeThemeAdvanced() {
+  if (typeof window.closeOv === "function") window.closeOv("ov-theme-adv");
+}
+
+export function resetAllCustomColors() {
+  if (!confirm("重置所有自定义颜色？")) return;
+  const settings = store.getSettings();
+  settings.customColors = {};
+  settings.accent = "";
+  settings.accentHue = null;
+  ["--acc", "--acc-t", "--hero-bg", "--bg", "--card", "--card-alt", "--nav-bg", "--t1", "--t2", "--t3", "--bdr"].forEach((v) => {
+    document.body.style.removeProperty(v);
+  });
+  store.setSettings(settings);
+  if (typeof window.applyTheme === "function") window.applyTheme();
+  try { if (typeof window.render === "function") window.render(); } catch (e) {}
+  try { if (typeof window.renderSettings === "function") window.renderSettings(); } catch (e) {}
+  openThemeAdvanced();
+  if (typeof window.showToast === "function") window.showToast("已全部重置为主题色");
+}
+
+// ── 类别设置 UI ───────────────────────────────────────────────────────────────
+
+const LUCIDE_PICKER_LIST = ["utensils","coffee","shopping-bag","store","gamepad-2","film","music","camera","car","plane","bus","home","heart-pulse","heart","dumbbell","wallet","piggy-bank","ticket","gift","gem","flame","star","sun","moon","book","book-open","briefcase","smile","package","target"];
+
+export function openCatSettings() {
+  renderCatSettings();
+  document.getElementById("ov-catsettings").style.display = "flex";
+}
+
+export function closeCatSettings() {
+  document.getElementById("ov-catsettings").style.display = "none";
+  if (typeof window.saveCustomCategories === "function") window.saveCustomCategories();
+  if (typeof window.buildManualCatRow === "function") window.buildManualCatRow();
+}
+
+export function renderCatSettings() {
+  const list = document.getElementById("catSettingsList");
+  list.innerHTML = "";
+  const cats = window.customCategories || [];
+  cats.forEach(function (c, i) {
+    const r = document.createElement("div");
+    r.className = "cs-row";
+    r.setAttribute("data-i", i);
+    r.setAttribute("draggable", "true");
+    const ico = document.createElement("div");
+    ico.className = "cs-ico";
+    ico.innerHTML = renderIconValue(c.icon, 22, 1.6);
+    ico.title = "点击修改图标";
+    ico.onclick = function () { editCatIcon(i); };
+    const nm = document.createElement("input");
+    nm.className = "cs-name";
+    nm.value = c.name;
+    nm.placeholder = "类别名";
+    nm.oninput = function () { cats[i].name = nm.value; };
+    nm.onblur = function () {
+      if (!nm.value.trim()) nm.value = cats[i].name = "新类别";
+      if (typeof window.saveCustomCategories === "function") window.saveCustomCategories();
+    };
+    const del = document.createElement("span");
+    del.className = "cs-del";
+    del.textContent = "删除";
+    del.onclick = function () { deleteCat(i); };
+    const drag = document.createElement("span");
+    drag.className = "cs-drag";
+    drag.textContent = "⋮⋮";
+    drag.title = "拖动排序";
+    r.appendChild(ico);
+    r.appendChild(nm);
+    if (cats.length > 1) r.appendChild(del);
+    r.appendChild(drag);
+    r.addEventListener("dragstart", function (e) {
+      r.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(i));
+    });
+    r.addEventListener("dragend", function () { r.classList.remove("dragging"); });
+    r.addEventListener("dragover", function (e) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; });
+    r.addEventListener("drop", function (e) {
+      e.preventDefault();
+      const from = parseInt(e.dataTransfer.getData("text/plain"), 10);
+      const to = i;
+      if (isNaN(from) || from === to) return;
+      const moved = cats.splice(from, 1)[0];
+      cats.splice(to, 0, moved);
+      if (typeof window.saveCustomCategories === "function") window.saveCustomCategories();
+      renderCatSettings();
+    });
+    let dragStartY = null, dragStartIdx = null;
+    drag.addEventListener("touchstart", function (e) {
+      dragStartY = e.touches[0].clientY;
+      dragStartIdx = i;
+      r.classList.add("dragging");
+    }, { passive: true });
+    drag.addEventListener("touchmove", function (e) {
+      if (dragStartY === null) return;
+      const y = e.touches[0].clientY;
+      const els = document.querySelectorAll("#catSettingsList .cs-row");
+      for (let k = 0; k < els.length; k++) {
+        const rect = els[k].getBoundingClientRect();
+        if (y >= rect.top && y <= rect.bottom) {
+          const ki = parseInt(els[k].getAttribute("data-i"), 10);
+          if (ki !== dragStartIdx) {
+            const moved = cats.splice(dragStartIdx, 1)[0];
+            cats.splice(ki, 0, moved);
+            dragStartIdx = ki;
+            if (typeof window.saveCustomCategories === "function") window.saveCustomCategories();
+            renderCatSettings();
+            return;
+          }
+        }
+      }
+      e.preventDefault();
+    }, { passive: false });
+    drag.addEventListener("touchend", function () {
+      r.classList.remove("dragging");
+      dragStartY = null;
+      dragStartIdx = null;
+    });
+    list.appendChild(r);
+  });
+}
+
+export function editCatIcon(i) {
+  openLucidePicker(
+    function (name) {
+      window.customCategories[i].icon = "lucide:" + name;
+      if (typeof window.saveCustomCategories === "function") window.saveCustomCategories();
+      renderCatSettings();
+    },
+    function () {
+      const cur = window.customCategories[i].icon;
+      let v = prompt("输入图标 emoji（例：🍔🛒🎯）:", typeof cur === "string" && cur.indexOf("lucide:") < 0 && cur.indexOf("<svg") < 0 ? cur : "📦");
+      if (v === null) return;
+      v = v.trim();
+      if (v) {
+        window.customCategories[i].icon = v;
+        if (typeof window.saveCustomCategories === "function") window.saveCustomCategories();
+        renderCatSettings();
+      }
+    }
+  );
+}
+
+export function openLucidePicker(onPick, onEmoji) {
+  const ov = document.getElementById("ov-lucide-picker");
+  if (!ov) return;
+  const grid = document.getElementById("lucide-picker-grid");
+  grid.innerHTML = "";
+  LUCIDE_PICKER_LIST.forEach(function (n) {
+    const c = document.createElement("div");
+    c.className = "lp-cell";
+    c.innerHTML = lucideSvg(n, 24, 1.6);
+    c.title = n;
+    c.onclick = function () { closeLucidePicker(); onPick(n); };
+    grid.appendChild(c);
+  });
+  document.getElementById("lp-emoji-btn").onclick = function () {
+    closeLucidePicker();
+    if (onEmoji) onEmoji();
+  };
+  ov.style.display = "flex";
+}
+
+export function closeLucidePicker() {
+  const ov = document.getElementById("ov-lucide-picker");
+  if (ov) ov.style.display = "none";
+}
+
+export function deleteCat(i) {
+  const cats = window.customCategories;
+  if (cats.length <= 1) {
+    if (typeof window.showToast === "function") window.showToast("至少保留 1 个类别");
+    return;
+  }
+  if (!confirm("删除类别 \"" + cats[i].name + "\"？已记录的交易不受影响。")) return;
+  cats.splice(i, 1);
+  if (typeof window.saveCustomCategories === "function") window.saveCustomCategories();
+  renderCatSettings();
+}
+
+export function addNewCat() {
+  window.customCategories.push({ name: "新类别", icon: "📦" });
+  if (typeof window.saveCustomCategories === "function") window.saveCustomCategories();
+  renderCatSettings();
+  const list = document.getElementById("catSettingsList");
+  setTimeout(function () { list.scrollTop = list.scrollHeight; }, 30);
+}
+
 // ── 导出给外部使用的颜色帮手 ────────────────────────────────────────────────
 
 export { hslToHex, contrastText, hexToHsl, getCurrentAccent, getEffectiveColor };

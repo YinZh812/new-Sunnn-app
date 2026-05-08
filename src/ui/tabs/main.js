@@ -4,7 +4,8 @@
 //   ✅ renderHero —— Hero 顶部区
 //   ✅ renderList —— 交易列表（按日分组 + 左滑删除 + 内联编辑入口）
 //   ✅ inlineEditDesc —— 列表行就地编辑描述
-//   ⚠️ inlineEditAmt（金额计算器弹窗 + #ov-iamt）、WheelTime 仍由 inline 实现
+//   ✅ inlineEditAmt —— 列表行就地编辑金额（#ov-iamt 弹窗 + 计算器）
+//   ✅ toggleDisplayCurrency —— Hero 顶部 €/¥ 切换
 //
 // 视图状态（_viewYear/_viewMonth）属于本 tab 私有，不进 store。
 // inline 的 changeMonth() 会调 render() → 经 window.renderList 桥接进入 mainTab.renderList，
@@ -390,4 +391,181 @@ export function inlineEditDesc(idx, rowEl) {
 function setText(id, value) {
   const el = byId(id);
   if (el) el.textContent = value;
+}
+
+// ── 显示币种切换 ────────────────────────────────────────────────────────────
+
+// ── 内联编辑：金额（#ov-iamt 弹窗） ─────────────────────────────────────────
+
+let _iaIdx = -1, _iaAmt = "", _iaHasDot = false, _iaDecCount = 0;
+let _iaOp = null, _iaPrev = null, _iaDate = null, _iaTia = null, _iaFloat = null;
+
+function _iaSetFromAmount(amt) {
+  _iaAmt = String(amt || "");
+  if (!_iaAmt || _iaAmt === "0" || _iaAmt === "0.0" || _iaAmt === "0.00") {
+    _iaAmt = ""; _iaHasDot = false; _iaDecCount = 0;
+  } else {
+    _iaHasDot = _iaAmt.indexOf(".") >= 0;
+    _iaDecCount = _iaHasDot ? _iaAmt.split(".")[1].length : 0;
+  }
+  _iaOp = null; _iaPrev = null;
+}
+
+function _iaDoOp(a, b, op) {
+  const x = parseFloat(a) || 0, y = parseFloat(b) || 0;
+  return parseFloat((op === "+" ? x + y : x - y).toFixed(2));
+}
+
+function _iaUpdateDisp() {
+  if (!_iaFloat) return;
+  const txs = store.getTxs();
+  const t = txs[_iaIdx];
+  if (!t) return;
+  const sym = t.currency === "CNY" ? "¥" : "€";
+  const sg = t.type === "expense" ? "−" : "+";
+  let show;
+  if (_iaOp && _iaPrev !== null && _iaAmt !== "") {
+    show = String(_iaDoOp(_iaPrev, _iaAmt, _iaOp));
+  } else if (_iaOp && _iaPrev !== null && _iaAmt === "") {
+    show = _iaPrev;
+  } else {
+    show = (_iaAmt !== "" ? _iaAmt : "0");
+  }
+  const num = parseFloat(show) || 0;
+  let expr = "";
+  if (_iaOp && _iaPrev !== null)
+    expr = _iaPrev + " " + (_iaOp === "-" ? "−" : _iaOp) + " " + (_iaAmt || "");
+  _iaFloat.innerHTML = (expr
+    ? '<span style="font-size:9px;color:var(--t3);margin-right:4px;font-weight:400">' + expr + '</span>'
+    : "") + sg + num.toFixed(2) + " " + sym;
+}
+
+function _iaUpdateDateBtn() {
+  const lbl = document.getElementById("iaDateLbl");
+  if (!lbl) return;
+  if (_iaDate) {
+    const d = new Date(_iaDate);
+    lbl.textContent = d.getFullYear() + "年" + (d.getMonth() + 1) + "月" + d.getDate() + "日";
+  } else {
+    lbl.textContent = "今天";
+  }
+}
+
+export function iaInput(k) {
+  if (/^[0-9]$/.test(k)) {
+    if (_iaHasDot && _iaDecCount >= 2) { if (typeof window.fxError === "function") window.fxError(); return; }
+    if (_iaHasDot) _iaDecCount++;
+    if (_iaAmt === "" || _iaAmt === "0") {
+      if (!_iaHasDot) _iaAmt = k; else _iaAmt += k;
+    } else _iaAmt += k;
+    if (typeof window.fxTap === "function") window.fxTap();
+  } else if (k === ".") {
+    if (_iaHasDot) { if (typeof window.fxError === "function") window.fxError(); return; }
+    if (_iaAmt === "") _iaAmt = "0";
+    _iaAmt += "."; _iaHasDot = true;
+    if (typeof window.fxTapAlt === "function") window.fxTapAlt();
+  } else if (k === "B") {
+    if (_iaAmt.length > 0) {
+      const rem = _iaAmt.charAt(_iaAmt.length - 1);
+      _iaAmt = _iaAmt.slice(0, -1);
+      if (rem === ".") _iaHasDot = false;
+      else if (_iaHasDot && _iaDecCount > 0) _iaDecCount--;
+      if (typeof window.fxTapAlt === "function") window.fxTapAlt();
+    } else if (_iaOp) {
+      _iaAmt = _iaPrev || ""; _iaOp = null; _iaPrev = null;
+      _iaHasDot = _iaAmt.indexOf(".") >= 0;
+      _iaDecCount = _iaHasDot ? _iaAmt.split(".")[1].length : 0;
+      if (typeof window.fxTapAlt === "function") window.fxTapAlt();
+    }
+  } else if (k === "+" || k === "-") {
+    if (_iaAmt === "" && _iaPrev === null) { if (typeof window.fxError === "function") window.fxError(); return; }
+    if (_iaAmt !== "") {
+      if (_iaOp && _iaPrev !== null) {
+        _iaPrev = String(_iaDoOp(_iaPrev, _iaAmt, _iaOp));
+      } else { _iaPrev = _iaAmt; }
+      _iaAmt = ""; _iaHasDot = false; _iaDecCount = 0;
+    }
+    _iaOp = k;
+    if (typeof window.fxTapAlt === "function") window.fxTapAlt();
+  }
+  _iaUpdateDisp();
+}
+
+export function iaDateChange(v) {
+  if (!v) { _iaDate = null; }
+  else { _iaDate = new Date(v + "T12:00:00").getTime(); }
+  _iaUpdateDateBtn();
+}
+
+export function inlineEditAmt(idx, rowEl) {
+  const txs = store.getTxs();
+  const t = txs[idx];
+  if (!t) return;
+  _iaIdx = idx;
+  _iaTia = rowEl.querySelector(".tia");
+  if (_iaTia) {
+    _iaTia.classList.add("editing-hl");
+    const rect = _iaTia.getBoundingClientRect();
+    _iaFloat = document.createElement("div");
+    _iaFloat.className = "tia-floating";
+    _iaFloat.style.left = (rect.left - 6) + "px";
+    _iaFloat.style.top = (rect.top - 3) + "px";
+    _iaFloat.style.minWidth = rect.width + "px";
+    _iaFloat.textContent = _iaTia.textContent;
+    document.body.appendChild(_iaFloat);
+  }
+  _iaSetFromAmount(t.amount);
+  _iaDate = t.ts;
+  _iaUpdateDisp();
+  _iaUpdateDateBtn();
+  const sym = t.currency === "CNY" ? "¥" : "€";
+  const sx = document.getElementById("iAmtSym");
+  if (sx) sx.textContent = sym;
+  const di = document.getElementById("iaDateInp");
+  if (di) {
+    const d = new Date(_iaDate);
+    di.value = d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+  }
+  if (typeof window.fxOpen === "function") window.fxOpen();
+  document.getElementById("ov-iamt").style.display = "flex";
+}
+
+export function closeIamt(save) {
+  if (save) {
+    const txs = store.getTxs();
+    const t = txs[_iaIdx];
+    if (t) {
+      let fa;
+      if (_iaOp && _iaPrev !== null) {
+        fa = _iaAmt !== "" ? _iaDoOp(_iaPrev, _iaAmt, _iaOp) : parseFloat(_iaPrev);
+      } else {
+        fa = parseFloat(_iaAmt || "0");
+      }
+      if (!fa || fa <= 0) {
+        if (typeof window.fxError === "function") window.fxError();
+        if (typeof window.showToast === "function") window.showToast("请输入金额");
+        return;
+      }
+      t.amount = parseFloat(fa.toFixed(2));
+      if (_iaDate) t.ts = _iaDate;
+      if (typeof window.saveTxs === "function") window.saveTxs(txs);
+      if (typeof window.fxSuccess === "function") window.fxSuccess();
+    }
+  } else {
+    if (typeof window.fxClose === "function") window.fxClose();
+  }
+  if (_iaTia) { _iaTia.classList.remove("editing-hl"); }
+  if (_iaFloat && _iaFloat.parentNode) { _iaFloat.parentNode.removeChild(_iaFloat); }
+  _iaTia = null; _iaFloat = null; _iaIdx = -1;
+  document.getElementById("ov-iamt").style.display = "none";
+  if (typeof window.render === "function") window.render();
+}
+
+/** Hero 顶部 €/¥ 切换按钮。与原 inline toggleDisplayCurrency 行为完全等价。 */
+export function toggleDisplayCurrency() {
+  if (typeof window.fxTap === "function") window.fxTap();
+  const settings = store.getSettings();
+  settings.displayCurrency = settings.displayCurrency === "CNY" ? "EUR" : "CNY";
+  store.setSettings(settings);
+  if (typeof window.render === "function") window.render();
 }

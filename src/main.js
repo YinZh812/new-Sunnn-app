@@ -318,6 +318,26 @@ window.getEffectiveColor = settingsTab.getEffectiveColor;
 window.hexToHsl          = settingsTab.hexToHsl;
 window.hslToHex          = settingsTab.hslToHex;
 window.contrastText      = settingsTab.contrastText;
+// 高级颜色自定义
+window.openColorPicker      = settingsTab.openColorPicker;
+window.bindLitSlider        = settingsTab.bindLitSlider;
+window.applyCppLive         = settingsTab.applyCppLive;
+window.saveAndRefreshCpp    = settingsTab.saveAndRefreshCpp;
+window.resetCustomColor     = settingsTab.resetCustomColor;
+window.closeColorPicker     = settingsTab.closeColorPicker;
+// 高级主题面板
+window.openThemeAdvanced    = settingsTab.openThemeAdvanced;
+window.closeThemeAdvanced   = settingsTab.closeThemeAdvanced;
+window.resetAllCustomColors = settingsTab.resetAllCustomColors;
+// 类别设置
+window.openCatSettings    = settingsTab.openCatSettings;
+window.closeCatSettings   = settingsTab.closeCatSettings;
+window.renderCatSettings  = settingsTab.renderCatSettings;
+window.editCatIcon        = settingsTab.editCatIcon;
+window.openLucidePicker   = settingsTab.openLucidePicker;
+window.closeLucidePicker  = settingsTab.closeLucidePicker;
+window.deleteCat          = settingsTab.deleteCat;
+window.addNewCat          = settingsTab.addNewCat;
 
 // ── 桥接输入流（doSend / openInputSheet / chooseCurrency / clearInputField）──
 //
@@ -337,9 +357,15 @@ window.openWheelTime    = wheelTime.openWheelTime;
 window.closeWheelTime   = wheelTime.closeWheelTime;
 window.openWheelTimeForTx = wheelTime.openWheelTimeForTx;
 
+// ── 桥接币种切换 ──────────────────────────────────────────────────────────
+window.toggleDisplayCurrency = mainTab.toggleDisplayCurrency;
+
 // ── 桥接内联编辑 ──────────────────────────────────────────────────────────
 window.inlineEditDesc = mainTab.inlineEditDesc;
-// inlineEditAmt 仍留在 inline（~25 行计算器状态机 + #ov-iamt 弹窗），待手动记账迁移时一并处理
+window.inlineEditAmt = mainTab.inlineEditAmt;
+window.closeIamt     = mainTab.closeIamt;
+window.iaInput       = mainTab.iaInput;
+window.iaDateChange  = mainTab.iaDateChange;
 
 // ── 桥接语音识别 ──────────────────────────────────────────────────────────
 window.toggleVoice = inputModal.toggleVoice;
@@ -354,6 +380,13 @@ window.setBudget       = goalsTab.setBudget;
 window.addGoal         = goalsTab.addGoal;
 window.deleteGoal      = goalsTab.deleteGoal;
 window.getBudgetCatList = goalsTab.getBudgetCatList;
+// 预算类别编辑器
+window.addBudgetCat         = goalsTab.addBudgetCat;
+window.deleteBudgetCat      = goalsTab.deleteBudgetCat;
+window.openBudgetCatEditor  = goalsTab.openBudgetCatEditor;
+window.closeBudgetCatEditor = goalsTab.closeBudgetCatEditor;
+window.renderBudgetCatEditor = goalsTab.renderBudgetCatEditor;
+window.addBudgetCatNew      = goalsTab.addBudgetCatNew;
 
 // ── 桥接 confirm modal 及其 onclick 依赖 ────────────────────────────────────
 //
