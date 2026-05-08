@@ -509,7 +509,7 @@ export function submitManual() {
 
   const t = {
     amount: amt, currency: mCur, category: mCat, type: mType,
-    desc, ts, timeLabel: "", timePrecision: "day",
+    desc, ts, timeLabel: "", timePrecision: "exact",
   };
 
   const txs = store.getTxs();
