@@ -12,11 +12,11 @@
 
 | 指标 | 重构前 | 当前 |
 |---|---|---|
-| `index.html` 行数 | 2109 | 959 |
-| inline `<script>` 行数 | ~1400 | ~620 |
+| `index.html` 行数 | 2109 | 575 |
+| inline `<script>` 行数 | ~1400 | ~220 |
 | CSS 位置 | `<style>` 700 行内联 | `styles/` 3 文件 702 行 |
-| JS 模块 | 0 | `src/` 33 文件 ~4100 行 |
-| Git | 无 | 2 commits |
+| JS 模块 | 0 | `src/` 33 文件 ~4300 行 |
+| Git | 无 | 10 commits |
 
 ### Phase 1：架构骨架（2026-05）
 
@@ -57,6 +57,13 @@
 | 21 | 第一轮死代码清理（删 143 行） | ✅ | index.html |
 | 22 | **导航系统**：激活 `attachNavClicks` + `showTab`，删 inline `showPage`/`goTab` | ✅ | nav.js, main.js, index.html |
 | 23 | **渲染枢纽**：`window.render` 桥接，删 inline `render()`/`renderList()` | ✅ | main.js, index.html |
+| 24 | **输入流**：`doSend`/`_doSendFinish`/`openInputSheet`/`chooseCurrency`/`clearInputField` | ✅ | input.js, main.js, index.html |
+| 25 | **格式帮手**：删 11 个死函数（rate/netV/sumT/fmtA/fmtLabel/dayL/groupListLbl/listTimInnerText/listTimBlockHtml/LIST_WK/fmtFull）| ✅ | index.html |
+| 26 | **内联编辑**：`inlineEditDesc` → mainTab 模块 | ✅ | main.js, index.html |
+| 27 | **WheelTime**：InfiniteWheel/openWheelTime/openWheelTimeForTx → wheel-time.js | ✅ | wheel-time.js, main.js, index.html |
+| 28 | **列表滑删**：删死 initListEdgeScroll/bindListRowSwipe（已由 swipe.js 完全接管）| ✅ | index.html |
+| 29 | **大规模死代码清理**：删所有已桥接的 manual/detail/confirm/颜色/格式/类别切换 inline 体 | ✅ | index.html |
+| 30 | **语音识别**：`toggleVoice` → input.js 模块 | ✅ | input.js, main.js, index.html |
 
 ---
 
@@ -158,21 +165,22 @@ inline <script> 同步执行           module <script type="module"> deferred
 
 ---
 
-## inline `<script>` 剩余待清理（~620 行）
+## inline `<script>` 剩余（~220 行，纯基础设施）
 
-按 SESSION-NOTES.md 优先级：
-
-| 区域 | 估计行数 | 依赖复杂度 | 说明 |
-|---|---|---|---|
-| 输入流 `doSend`/`_doSendFinish` | ~80 | 高 | 语音→解析→确认/手动分流 |
-| 内联编辑 `inlineEditDesc`/`inlineEditAmt` | ~50 | 中 | 列表行就地编辑，已有模块骨架 `inline-edit.js` |
-| WheelTime `InfiniteWheel`/`WheelTime` | ~90 | 中 | 滚轮时间选择，已有模块骨架 `wheel-time.js` |
-| 手动记账变量/函数 | ~100 | 高 | 计算器状态机、类型/货币/类别 UI 切换 |
-| 类别设置 `renderCatSettings` 等 | ~120 | 中 | 自定义类别 CRUD |
-| 语音识别 `toggleVoice`/`rec`/`final` | ~60 | 中 | Web Speech API 集成 |
-| 高级主题自定义 | ~60 | 低 | openThemeAdvanced/openColorPicker 等 |
-| 列表滑删 `bindListRowSwipe` | ~30 | 低 | 已有模块骨架 `swipe.js` |
-| 格式帮手（fallback） | ~30 | 低 | 已被桥接覆盖，仅作 fallback |
+| 区域 | 说明 |
+|---|---|
+| SFX/VIB/fx* | 音效+震动全局函数，被所有模块通过 window.* 调用 |
+| LUCIDE 图标引擎 + lucideSvg/renderIconValue | SVG 图标渲染 |
+| CAT_LIST/THEMES/ACCENT_COLORS | 静态配置数据 |
+| 全局状态变量 (txs/settings/...) | 被 hookInlineSaves 同步 |
+| pad/ls*/loadAll/save* | 数据持久化层 |
+| initSwipe | 弹窗下划关闭手势（启动时绑定） |
+| ADV_COLOR_KEYS + 高级主题 | openColorPicker/bindLitSlider 等（~15 行） |
+| 类别设置 UI | renderCatSettings/openCatSettings 等（~25 行） |
+| 金额内联编辑 | inlineEditAmt + 计算器（~22 行，#ov-iamt 弹窗） |
+| 预算编辑器 | renderBudgetCatEditor 等（~15 行） |
+| 杂项 UI | toggleDisplayCurrency/toggleSavingsPanel/startEditUserName/closeOv/cp/selCM（~10 行） |
+| 事件监听 + auth stub + save wrapper | 启动序列（~40 行） |
 
 ---
 

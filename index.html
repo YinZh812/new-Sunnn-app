@@ -493,8 +493,7 @@ function renderBudgetCatEditor(){
 function addBudgetCatNew(){var name=prompt("新类别名称：");if(!name)return;name=name.trim();if(!name)return;if(!settings.budgetCatOrder)settings.budgetCatOrder=getBudgetCatList();if(settings.budgetCatOrder.indexOf(name)>=0){showToast("已存在");return}settings.budgetCatOrder.push(name);saveSettings();renderBudgetCatEditor();fxTap()}
 /* ── addGoal/deleteGoal 已迁移至 src/ui/tabs/goals.js ── */
 
-function downloadBlob(content,filename,mime){try{var blob=new Blob([content],{type:mime||"text/plain"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url)},200)}catch(e){console.error("下载失败",e);showToast("下载失败")}}
-
+/* ── downloadBlob 已迁移至 src/ui/tabs/settings.js ── */
 /* ── 导入功能已迁移至 src/ui/tabs/settings.js ── */
 
 function toggleSavingsPanel(){var panel=document.getElementById("savings-panel");var arrow=document.getElementById("savings-arrow");if(!panel)return;var open=panel.classList.toggle("open");if(arrow)arrow.classList.toggle("open",open)}

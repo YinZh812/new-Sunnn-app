@@ -6,7 +6,7 @@
 
 ## 一句话现状
 
-`index.html` 从 2109 行单文件起步 → 现在 629 行。模块化源码（`src/` 33 个文件）已完整接管 Hero、列表、分析页、设置页、目标页、推荐词、7 个 modal、导航系统、渲染枢纽、输入流、格式帮手、描述内联编辑、WheelTime、列表滑删/边缘手势、**手动记账（calc+open+submit）、详情（open+render+edit）、确认（confirm+delete）、颜色帮手**。inline 剩余 ~270 行：金额内联编辑(#ov-iamt)、类别设置(CatSettings)、语音识别(toggleVoice)、高级主题(ColorPicker)、杂项UI。
+`index.html` 从 2109 行单文件起步 → 现在 575 行（**-72.7%**）。模块化源码（`src/` 33 个文件）已完整接管所有核心业务逻辑。inline `<script>` 剩余约 220 行纯必要基础设施：SFX/VIB/fx*、LUCIDE 图标引擎、全局数据层、类别数据、initSwipe、高级主题 ColorPicker、类别设置 UI、预算编辑器、杂项UI（toggleDisplayCurrency/toggleSavingsPanel/startEditUserName/closeOv/cp/selCM/事件监听/auth stub/save wrapper）。
 
 ---
 
@@ -137,7 +137,16 @@ inline 与模块的 auth.js 各创建了一个 Supabase client。两者共享同
    - `src/main.js`：激活 attachNavClicks、showTab("main") 首屏、window.showPage/window.render 桥接
    - `index.html`：删除 showPage/goTab 函数、render/renderList 函数、移除 nav onclick 属性
    - 删 render/renderList 约 53 行，inline 从 1008 → 959 行
-7. **继续清理 inline 死代码**（内联编辑、WheelTime、类别设置、手动记账、语音识别、高级主题、输入流、列表滑删）
+7. ~~**继续清理 inline 死代码**~~ ✅ 已完成
+   - 删手动记账 mc*/openManual/submitManual/saveDraft/restoreDraft 等
+   - 删详情 openDetail/renderDetailBody/detailEdit*/doEdit/doDelete
+   - 删确认 confirmDelete/resetDeleteConfirmRow/cancelDeleteConfirm/executeDeleteConfirm
+   - 删颜色 hslToHex/hexToHsl/contrastText/getCurrentAccent/getEffectiveColor/applyTheme
+   - 删格式 escTx/showToast/amtC/typeL/getTopDescs
+   - 删类别切换 selTypeTab/selCurPill/buildManualCatRow 等
+   - 迁语音识别 toggleVoice → input.js
+   - 删 downloadBlob
+   - 689→575（本轮 session 净减 114 行）
 
 ---
 
