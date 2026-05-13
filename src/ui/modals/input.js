@@ -14,7 +14,7 @@
 import { byId, on, qsa } from "../../utils/dom.js";
 import { openOverlay, closeOverlay, attachSheetSwipe } from "../components/overlay.js";
 import { fxTap, fxOpen, fxClose } from "../components/sfx.js";
-import { parseVoiceText } from "../../domain/voice/parser.js";
+import { parseVoiceText } from "../../domain/voice/parser.active.js";
 import { store } from "../../state/store.js";
 import { DEFAULT_CATS_BY_TYPE } from "../../domain/categories.js";
 
