@@ -32,6 +32,12 @@ const CASES = [
   { input: "Engie退23.67转朋友12",                           expectAmount: 23.67, expectType: "income",  note: "type=income（退）；类别=转账" },
   // ── 已知边界 case（同 v1，标 knownEdge 不计失败） ──
   { input: "朋友赌我最后一球不进100rmb",                    expectAmount: 100,   expectType: "income",  note: '"最后"被误切（known edge）', knownEdge: true },
+
+  // ── 阶段 2 新增：预处理（emoji / 全半角 / 错字） ──
+  { input: "看电影🍿50",                                    expectAmount: 50,    expectType: "expense", note: "emoji → 爆米花" },
+  { input: "午饭１２",                                       expectAmount: 12,    expectType: "expense", note: "全角数字 → 12" },
+  { input: "麦单劳午餐40",                                   expectAmount: 40,    expectType: "expense", note: "错字 麦单劳 → 麦当劳（类别=吃）" },
+  { input: "咖啡１８欧",                                     expectAmount: 18,    expectType: "expense", note: "全角数字 + 货币（EUR）" },
 ];
 
 const MULTI_CASE = "今天加油，然后买了orange，还吃了kebab";
