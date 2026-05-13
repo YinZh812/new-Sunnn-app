@@ -38,6 +38,13 @@ const CASES = [
   { input: "午饭１２",                                       expectAmount: 12,    expectType: "expense", note: "全角数字 → 12" },
   { input: "麦单劳午餐40",                                   expectAmount: 40,    expectType: "expense", note: "错字 麦单劳 → 麦当劳（类别=吃）" },
   { input: "咖啡１８欧",                                     expectAmount: 18,    expectType: "expense", note: "全角数字 + 货币（EUR）" },
+
+  // ── 阶段 3 新增：中文数字金额 ──
+  { input: "三块五",                                         expectAmount: 3.5,   expectType: "expense", note: "中文 整.小（块）" },
+  { input: "十二块八",                                       expectAmount: 12.8,  expectType: "expense", note: "中文 十二.八" },
+  { input: "前天打车三十块",                                 expectAmount: 30,    expectType: "expense", note: "中文 整（块）+ 日期前缀" },
+  { input: "一百六买鞋",                                     expectAmount: 160,   expectType: "expense", note: "中文 百（无单位）" },
+  { input: "两千五的相机",                                   expectAmount: 2500,  expectType: "expense", note: "中文 千（无单位）" },
 ];
 
 const MULTI_CASE = "今天加油，然后买了orange，还吃了kebab";

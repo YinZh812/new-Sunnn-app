@@ -76,6 +76,77 @@ export function voiceDetectCurrency(text, defaultCurrency) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 中文数字解析（v2 阶段 3 新增）
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// 触发条件：在 voiceExtractAmount 末尾，所有 Arabic 路径失败时才走 CN。
+// 支持模式：
+//   - 强：X[块/元][Y]      e.g. 三块五=3.5、十二块八=12.8、三十块=30
+//   - 弱：含 百/千/万 的纯 CN  e.g. 一百六=160、两千五=2500、两万三千=23000
+// 故意不支持单字"三/八" 等纯个位数（与数量词冲突）；仅"十"开头也不接受（弱模式要求百/千/万）。
+//
+// "零" 用作间隔标记：
+//   - "一百六"   → 6 视为十位 → 160
+//   - "一百零六" → 6 视为个位 → 106
+
+const CN_DIGIT = { 零:0, 一:1, 二:2, 两:2, 三:3, 四:4, 五:5, 六:6, 七:7, 八:8, 九:9 };
+const CN_UNIT  = { 十:10, 百:100, 千:1000, 万:10000 };
+const CN_INT_CHARS = "零一二两三四五六七八九十百千万";
+const RE_CN_INT_RUN     = new RegExp(`([${CN_INT_CHARS}]+)`);
+const RE_CN_AMOUNT_UNIT = new RegExp(`([${CN_INT_CHARS}]+)\\s*[块元](?:钱)?\\s*([${CN_INT_CHARS}])?`);
+
+function parseChineseInt(s) {
+  let total = 0;
+  let current = 0;
+  let lastUnit = 0;
+  let zeroSeen = false;
+  for (const c of s) {
+    if (c === "零") { zeroSeen = true; continue; }
+    if (c in CN_DIGIT) {
+      current = CN_DIGIT[c];
+    } else if (c in CN_UNIT) {
+      const unit = CN_UNIT[c];
+      if (current === 0 && unit === 10) current = 1; // "十二" 开头补 1
+      if (unit >= 10000) {
+        total = (total + current) * unit;
+        current = 0;
+      } else {
+        total += current * unit;
+        current = 0;
+        lastUnit = unit;
+      }
+      zeroSeen = false;
+    }
+    // 其他字符（包含未识别字）忽略
+  }
+  if (current > 0) {
+    if (zeroSeen || lastUnit === 0) total += current;
+    else total += current * (lastUnit / 10); // 省略末位单位："一百六" 的 6 默认在十位
+  }
+  return total;
+}
+
+/** 从文本里抓 CN 金额。返回数值或 null。 */
+function voiceExtractAmountCN(text) {
+  // 强模式：必须有 块/元
+  const m = text.match(RE_CN_AMOUNT_UNIT);
+  if (m) {
+    const intPart = parseChineseInt(m[1]);
+    if (Number.isFinite(intPart) && intPart > 0) {
+      const frac = m[2] != null ? (CN_DIGIT[m[2]] ?? 0) : 0;
+      return parseFloat((intPart + frac * 0.1).toFixed(2));
+    }
+  }
+  // 弱模式：纯 CN，但必须含 百/千/万（避免"十个鸡蛋"误识别）
+  const m2 = text.match(RE_CN_INT_RUN);
+  if (m2 && /[百千万]/.test(m2[1])) {
+    const v = parseChineseInt(m2[1]);
+    if (Number.isFinite(v) && v >= 10) return v;
+  }
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 金额提取
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -127,7 +198,12 @@ export function voiceExtractAmount(text) {
     if (n2 >= 1900 && n2 <= 2100 && am[0].length === 4) continue;
     allNums.push(n2);
   }
-  if (!allNums.length) return null;
+  if (!allNums.length) {
+    // v2 阶段 3：阿拉伯数字一个都没有 → 尝试中文数字
+    const cnAmt = voiceExtractAmountCN(text);
+    if (cnAmt !== null && cnAmt > 0) return { amount: cnAmt };
+    return null;
+  }
   return { amount: Math.max(...allNums) };
 }
 
@@ -141,6 +217,11 @@ export function voiceCleanDesc(text) {
   desc = desc.replace(/^(?:还|又|再)\s*/, "");
   desc = desc.replace(/^(?:今天|昨天|前天|今日)\s*/, "");
   desc = desc.replace(/\s*\d+(?:\.\d+)?(?:\s*[+＋]\s*\d+(?:\.\d+)?)?\s*(?:rmb|欧|欧元|元|块|块钱|€|¥|￥|\$)?\s*$/i, "");
+  // v2 阶段 3：剥离末尾的中文金额
+  //   1) 带 块/元 单位：三块五 / 十二块八 / 三十块（钱）
+  desc = desc.replace(/\s*[零一二两三四五六七八九十百千万]+\s*[块元](?:钱)?\s*[零一二三四五六七八九]?\s*$/, "");
+  //   2) 不带单位但含 百/千/万：一百六 / 两千五 / 三千八百（"十"开头/末尾不剥避免误伤"几十"之类）
+  desc = desc.replace(/\s*[零一二两三四五六七八九]*[百千万][零一二两三四五六七八九十百千万]*\s*$/, "");
   desc = desc.trim();
   return desc.slice(0, 30) || "消费";
 }
