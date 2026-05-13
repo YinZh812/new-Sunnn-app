@@ -19,8 +19,9 @@ import { store } from "./state/store.js";
 import { restoreSession, onAuthChange } from "./state/auth.js";
 import { attachSync, onSyncStatus } from "./state/sync.js";
 
-import { parseVoiceText } from "./domain/voice/parser.js";
+import { parseVoiceText } from "./domain/voice/parser.active.js";
 import { runVoiceTests } from "./domain/voice/tests.js";
+import { runVoiceTestsV2 } from "./domain/voice/tests.v2.js";
 
 import { byId } from "./utils/dom.js";
 import {
@@ -182,8 +183,9 @@ window.acct = Object.freeze({
   tabs: { mainTab, analysisTab, goalsTab, settingsTab, searchTab },
 });
 
-// 控制台兼容入口：runVoiceTests() 老用法
+// 控制台兼容入口：runVoiceTests() 老用法 + v2 单独入口
 window.runVoiceTests = runVoiceTests;
+window.runVoiceTestsV2 = runVoiceTestsV2;
 
 // ── 渐进迁移期：nav 桥接（inline showPage/goTab 已删除，由模块 attachNavClicks + showTab 接管）──
 //
