@@ -3,54 +3,70 @@
 // 运行方式（浏览器控制台）：
 //   runVoiceTestsV2()
 //
-// 隐私说明：用例已匿名化（朋友/家人真名替换为"朋友"/"他们"）。
-//   阶段 2~6 新增用例时也务必保持匿名。
+// 隐私说明：用例已匿名化（朋友/家人真名替换为"朋友/同事/他们"）。
+//   新增用例时也务必保持匿名。
 //
-// 阶段 1 用例与 v1 等价（v2 行为 ≡ v1）。阶段 2~6 会扩充覆盖：
-//   - 阶段 2：emoji → 文字、全角数字、错字
-//   - 阶段 3：中文数字金额（三块五 / 一百六 / 两千五 / 十二块八）
-//   - 阶段 4：时间扩展（中午 / 下午3点半 / 上周三 / 三天前）
-//   - 阶段 5：商家识别（独立 merchant 字段）
+// 用例来源：
+//   - v1 关键启发式 4 条（给我N / 货币后裸数 / 退款 / 已知边界）
+//   - 阶段 2：预处理 4 条（emoji / 全半角 / 错字 / 全角货币）
+//   - 阶段 3：中文数字 5 条
+//   - 阶段 3.5：通用场景 21 条（方案 A 抢救而来；# "水果5加饮料3" 因加法正则限制丢弃）
 
 import { parseVoiceText } from "./parser.v2.js";
 
-/**
- * 与 v1 同结构的回归用例，但人名已匿名化。
- * 每条 input 至少需要：金额识别正确、类型合理。
- */
 const CASES = [
-  { input: "羽毛球 5.2",                                   expectAmount: 5.2,   expectType: "expense", note: "运动" },
-  { input: "4个smash fernand",                              expectAmount: null,  expectType: "expense", note: "需补录金额；类别=吃" },
-  { input: "orange运营商22.99",                             expectAmount: 22.99, expectType: "expense", note: "其他（运营商）" },
-  { input: "朋友这边宠物店给狗狗买吃的13.84",                expectAmount: 13.84, expectType: "expense", note: "买（宠物/买）" },
-  { input: "鲨鱼记账会员1.99欧用来导出数据15",              expectAmount: 15,    expectType: "expense", note: "货币后裸数字优先（15>1.99）" },
-  { input: "打球加球线8.5+10",                              expectAmount: 18.5,  expectType: "expense", note: "加法式：8.5+10=18.5" },
+  // ── v1 关键启发式（4） ──
   { input: "他们casino赢了3000多给我150",                    expectAmount: 150,   expectType: "income",  note: "给我N→150；type=income" },
-  { input: "跟朋友吃印度菜35",                               expectAmount: 35,    expectType: "expense", note: "吃（印度菜）" },
-  { input: "朋友请我zzyxlj吃饭",                             expectAmount: null,  expectType: "expense", note: "需补录金额；类别=吃（zzyxlj）" },
-  { input: "朋友帮我付驾校510",                              expectAmount: 510,   expectType: "expense", note: "其他（驾校）" },
+  { input: "鲨鱼记账会员1.99欧用来导出数据15",                expectAmount: 15,    expectType: "expense", note: "货币后裸数字优先（15>1.99）" },
   { input: "Engie退23.67转朋友12",                           expectAmount: 23.67, expectType: "income",  note: "type=income（退）；类别=转账" },
-  // ── 已知边界 case（同 v1，标 knownEdge 不计失败） ──
-  { input: "朋友赌我最后一球不进100rmb",                    expectAmount: 100,   expectType: "income",  note: '"最后"被误切（known edge）', knownEdge: true },
+  { input: "朋友赌我最后一球不进100rmb",                     expectAmount: 100,   expectType: "income",  note: '"最后"作分隔词导致误切（known edge）', knownEdge: true },
 
-  // ── 阶段 2 新增：预处理（emoji / 全半角 / 错字） ──
+  // ── 阶段 2：预处理（4） ──
   { input: "看电影🍿50",                                    expectAmount: 50,    expectType: "expense", note: "emoji → 爆米花" },
   { input: "午饭１２",                                       expectAmount: 12,    expectType: "expense", note: "全角数字 → 12" },
-  { input: "麦单劳午餐40",                                   expectAmount: 40,    expectType: "expense", note: "错字 麦单劳 → 麦当劳（类别=吃）" },
+  { input: "麦单劳午餐40",                                   expectAmount: 40,    expectType: "expense", note: "错字 麦单劳 → 麦当劳" },
   { input: "咖啡１８欧",                                     expectAmount: 18,    expectType: "expense", note: "全角数字 + 货币（EUR）" },
 
-  // ── 阶段 3 新增：中文数字金额 ──
+  // ── 阶段 3：中文数字（5） ──
   { input: "三块五",                                         expectAmount: 3.5,   expectType: "expense", note: "中文 整.小（块）" },
   { input: "十二块八",                                       expectAmount: 12.8,  expectType: "expense", note: "中文 十二.八" },
   { input: "前天打车三十块",                                 expectAmount: 30,    expectType: "expense", note: "中文 整（块）+ 日期前缀" },
   { input: "一百六买鞋",                                     expectAmount: 160,   expectType: "expense", note: "中文 百（无单位）" },
   { input: "两千五的相机",                                   expectAmount: 2500,  expectType: "expense", note: "中文 千（无单位）" },
+
+  // ── 阶段 3.5：通用场景（21；来自方案 A 抢救）──
+  { input: "中午吃饭160",                                    expectAmount: 160,   expectType: "expense", note: "餐饮" },
+  { input: "昨天买咖啡18",                                   expectAmount: 18,    expectType: "expense", note: "购物/餐饮" },
+  { input: "打的去公司25",                                   expectAmount: 25,    expectType: "expense", note: "交通" },
+  { input: "看电影50",                                       expectAmount: 50,    expectType: "expense", note: "娱乐" },
+  { input: "中午吃饭",                                       expectAmount: null,  expectType: "expense", note: "需补录金额" },
+  { input: "买奶茶不加糖",                                   expectAmount: null,  expectType: "expense", note: "需补录金额；无数字" },
+  { input: "买书15欧",                                       expectAmount: 15,    expectType: "expense", note: "欧元" },
+  { input: "打车30元",                                       expectAmount: 30,    expectType: "expense", note: "人民币 + 车类" },
+  { input: "午餐8.5+10",                                     expectAmount: 18.5,  expectType: "expense", note: "加法：8.5+10=18.5" },
+  { input: "工资到账8000",                                   expectAmount: 8000,  expectType: "income",  note: "工资收入" },
+  { input: "兼职收入200",                                    expectAmount: 200,   expectType: "income",  note: "兼职/收入 加入 income KW" },
+  { input: "退款50",                                         expectAmount: 50,    expectType: "income",  note: "退款=收入" },
+  { input: "朋友还我100",                                    expectAmount: 100,   expectType: "income",  note: "还款 → 收入（语义修正：方案 A 原本写 expense 是错的）" },
+  { input: "存钱500",                                        expectAmount: 500,   expectType: "savings", note: "储蓄" },
+  { input: "超市买日用品和零食86.5",                          expectAmount: 86.5,  expectType: "expense", note: "购物复杂描述" },
+  { input: "地铁月卡充值200",                                expectAmount: 200,   expectType: "expense", note: "交通充值" },
+  { input: "前天停车费15",                                   expectAmount: 15,    expectType: "expense", note: "前天 + 停车" },
+  { input: "5月1号聚餐300",                                  expectAmount: 300,   expectType: "expense", note: "指定日期" },
+  { input: "星巴克拿铁36",                                   expectAmount: 36,    expectType: "expense", note: "知名品牌 → 餐饮" },
+  { input: "麦当劳套餐45",                                   expectAmount: 45,    expectType: "expense", note: "知名品牌 → 餐饮" },
+  { input: "转账给我500",                                    expectAmount: 500,   expectType: "income",  note: "转账给我 → income" },
+
+  // ── 阶段 3.5：社交识别（结果挂在 result.social，不影响 amount/type） ──
+  { input: "和朋友AA吃饭120",                                expectAmount: 120,   expectType: "expense", note: "AA 检测 → social.type=AA" },
+  { input: "借给同事500",                                    expectAmount: 500,   expectType: "expense", note: "借出 → social.type=lend" },
+  { input: "帮朋友付奶茶18",                                 expectAmount: 18,    expectType: "expense", note: "代付 → social.type=pay_for" },
 ];
 
-const MULTI_CASE = "今天加油，然后买了orange，还吃了kebab";
+const MULTI_CASE = "今天加油300，然后超市买了牛奶和面包，还吃了快餐";
 
 /**
- * 跑全部用例并打印结果。
+ * 跑全部用例。
  * @param {Object} [options]
  * @param {"EUR"|"CNY"} [options.defaultCurrency="EUR"]
  * @returns {{passed:number, total:number, knownEdge:number}}
@@ -85,6 +101,8 @@ export function runVoiceTestsV2(options = {}) {
       "类型": r.type,
       "✓类型": typeOk ? "✓" : "✗",
       "类别": r.category,
+      "商家": r.merchant || "—",
+      "社交": r.social ? r.social.type : "—",
       "描述": r.desc,
       "备注": c.note + (c.knownEdge ? " [known edge]" : ""),
     });

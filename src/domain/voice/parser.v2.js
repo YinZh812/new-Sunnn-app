@@ -21,6 +21,9 @@ import {
   VOICE_CAT_MAP,
   VOICE_INCOME_KW,
   VOICE_SAVINGS_KW,
+  TOTAL_WORDS,
+  QUANTIFIERS,
+  MERCHANT_WHITELIST,
 } from "./dictionary.v2.js";
 import { preprocess } from "./preprocess.js";
 
@@ -184,12 +187,14 @@ export function voiceExtractAmount(text) {
     return { amount: lastCur };
   }
 
+  // v2 阶段 3.5：量词从 dict 驱动（取代 v1 的硬编码组）
+  const quantifierGroup = QUANTIFIERS.map((q) => q.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")).join("|");
   const cleanText = text
     .replace(/\d{1,4}\s*年/g, " ")
     .replace(/\d{1,2}\s*月/g, " ")
     .replace(/\d{1,2}\s*[号日]/g, " ")
     .replace(/\d{1,2}\s*[点时]/g, " ")
-    .replace(/(\d+)\s*(?:个|份|次|条|张|只|件|套|台|本|双|对|瓶|罐|箱|袋)/g, " ");
+    .replace(new RegExp(`(\\d+)\\s*(?:${quantifierGroup})`, "g"), " ");
   const allNums = [];
   const re2 = /(\d+(?:\.\d+)?)/g;
   let am;
@@ -254,6 +259,63 @@ export function voiceExtractDate(text) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 商家识别（v2 阶段 3.5 抢救自方案 A）
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// 命中 MERCHANT_WHITELIST 后写入 ParseResult.merchant 独立字段（UI 暂未消费，阶段 5 扩展）。
+// 不改 desc、不强制覆盖 category。
+
+export function voiceDetectMerchant(text) {
+  const lower = text.toLowerCase();
+  const sorted = [...MERCHANT_WHITELIST].sort((a, b) => b.length - a.length);
+  for (const m of sorted) {
+    if (lower.includes(m.toLowerCase())) return m;
+  }
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 社交识别：AA / 代付 / 借出 / 还款（v2 阶段 3.5 抢救自方案 A）
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// 输出形如：
+//   AA       → { type:"AA",       person, perAmount, total }
+//   代付     → { type:"pay_for",  person, amount, direction:"out" }
+//   借出     → { type:"lend",     person, amount, direction:"out" }
+//   还款     → { type:"repay",    person, amount, direction:"in"  }
+//
+// 注意：
+//   - 写入 ParseResult.social，但不强制改 type/category/amount
+//     （让 voiceDetectType 主导；future stage 5 由 UI 决定怎么用）
+//   - TODO 阶段 5：人名正则太贪（\S{1,6}），需补充边界（撞"一起"/"们"等）
+
+export function voiceDetectSocial(text, amount) {
+  // AA / 平摊
+  const aaM = text.match(/(?:和|跟|与|同)(\S{1,6}?)(?:一起)?(?:aa|AA|平摊|分摊|均摊)/);
+  if (aaM) {
+    const person = aaM[1] || "朋友";
+    const perAmount = amount ? parseFloat((amount / 2).toFixed(2)) : null;
+    return { type: "AA", person, perAmount, total: amount };
+  }
+  // 代付：帮XX付/买/交/订
+  const payM = text.match(/帮(\S{1,6}?)(?:付|买|交|订)/);
+  if (payM) {
+    return { type: "pay_for", person: payM[1], amount, direction: "out" };
+  }
+  // 借出：借给XX
+  const lendM = text.match(/借给(\S{1,6}?)\s*\d/);
+  if (lendM) {
+    return { type: "lend", person: lendM[1], amount, direction: "out" };
+  }
+  // 还款：XX还我
+  const repayM = text.match(/(\S{1,6}?)还我/);
+  if (repayM) {
+    return { type: "repay", person: repayM[1], amount, direction: "in" };
+  }
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 多笔切分
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -269,6 +331,11 @@ const STRONG_SEPARATORS = [
 const VERBS_AFTER_HUAN = "吃玩买加用乘坐去看喝花付付款打交付报订";
 
 export function voiceSplitInput(text) {
+  // v2 阶段 3.5：含"一共/合计/总共/总计/加起来/一起" → 视为单笔，整段不切
+  for (const w of TOTAL_WORDS) {
+    if (text.includes(w)) return [text.trim()];
+  }
+
   let s = text;
 
   for (const sep of STRONG_SEPARATORS) s = s.split(sep).join("‖");
@@ -382,6 +449,11 @@ export function parseVoiceText(text, options) {
       if (!allowed.includes(mappedCat)) mappedCat = "其他";
     }
 
+    // v2 阶段 3.5：附加元数据 —— UI 暂不消费，阶段 5 扩展
+    const merchant = voiceDetectMerchant(seg);
+    const amountForSocial = needAmt ? null : amtInfo.amount;
+    const social = amountForSocial ? voiceDetectSocial(seg, amountForSocial) : null;
+
     results.push({
       ok: !needAmt,
       needAmountInput: needAmt,
@@ -395,6 +467,9 @@ export function parseVoiceText(text, options) {
       timeLabel: dateInfo.label,
       timePrecision: dateInfo.label ? "day" : "exact",
       yearOnly: null,
+      // v2 新增字段（UI 未消费）
+      merchant,
+      social,
     });
   }
   return results;
