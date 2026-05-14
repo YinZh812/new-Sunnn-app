@@ -7,4 +7,4 @@
 // 验证 v2：浏览器控制台执行 runVoiceTestsV2()，不需要打开开关就能跑回归。
 // 切换流程：本地改成 true → 跑 runVoiceTestsV2 + 手机测一遍 → 提交 → push。
 
-export const USE_VOICE_V2 = false;
+export const USE_VOICE_V2 = true;
