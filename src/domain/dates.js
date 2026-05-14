@@ -22,15 +22,15 @@ export const TIME_PRECISION = Object.freeze({
 export const WEEKDAY_LABELS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
 
 /**
- * 列表项时间标签：优先 timeLabel；否则按精度生成。
- * 与原 fmtLabel(t) 行为一致。
+ * 列表项时间标签：用 timeLabel 作日期前缀（若有），按精度附加时间部分。
+ * 与原 fmtLabel(t) 行为基本一致，并支持 daytime 精度显示原始时段词。
  */
 export function formatTransactionTime(tx) {
-  if (tx.timeLabel) return tx.timeLabel;
   const d = new Date(tx.ts);
-  const base = `${d.getMonth() + 1}月${d.getDate()}日`;
+  const base = tx.timeLabel || `${d.getMonth() + 1}月${d.getDate()}日`;
   const prec = tx.timePrecision;
   if (!prec || prec === "day" || prec === "month" || prec === "year_only") return base;
+  if (prec === "daytime" && tx.timePhrase) return `${base} ${tx.timePhrase}`;
   return `${base} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 

@@ -68,6 +68,11 @@ const CASES = [
   { input: "三天前买书50",                                   expectAmount: 50,    expectType: "expense", note: "三天前 → 当前-3 天，precision=day" },
   { input: "上周三聚餐200",                                  expectAmount: 200,   expectType: "expense", note: "上周三 → 上周对应工作日" },
   { input: "中午12点吃饭30",                                 expectAmount: 30,    expectType: "expense", note: "中午+12点显式 → 12:00，precision=exact" },
+
+  // ── 阶段 4.1：仅时段词 → daytime 精度，UI 显示时段原词 ──
+  { input: "中午吃饭50",                                     expectAmount: 50,    expectType: "expense", note: "仅'中午' → precision=daytime, timePhrase='中午'" },
+  { input: "晚上喝奶茶25",                                   expectAmount: 25,    expectType: "expense", note: "仅'晚上' → daytime/'晚上'" },
+  { input: "昨天下午看电影60",                               expectAmount: 60,    expectType: "expense", note: "昨天+仅'下午' → daytime + 日期" },
 ];
 
 const MULTI_CASE = "今天加油300，然后超市买了牛奶和面包，还吃了快餐";
@@ -102,9 +107,15 @@ export function runVoiceTestsV2(options = {}) {
     }
 
     const tsD = new Date(r.ts);
-    const tsLabel = r.timePrecision === "exact"
-      ? `${tsD.getMonth()+1}/${tsD.getDate()} ${String(tsD.getHours()).padStart(2,"0")}:${String(tsD.getMinutes()).padStart(2,"0")}`
-      : `${tsD.getMonth()+1}/${tsD.getDate()} (day)`;
+    const datePart = `${tsD.getMonth()+1}/${tsD.getDate()}`;
+    let tsLabel;
+    if (r.timePrecision === "exact") {
+      tsLabel = `${datePart} ${String(tsD.getHours()).padStart(2,"0")}:${String(tsD.getMinutes()).padStart(2,"0")}`;
+    } else if (r.timePrecision === "daytime") {
+      tsLabel = `${datePart} ${r.timePhrase || "?"}`;
+    } else {
+      tsLabel = `${datePart} (day)`;
+    }
     rows.push({
       "输入": c.input,
       "金额": r.amount,

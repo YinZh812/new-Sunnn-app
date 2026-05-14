@@ -256,13 +256,14 @@ export function voiceCleanDesc(text) {
 //   - 组合：昨天下午3点 / 晚上8点半（period 在 PM 时把 N点 1-11 推 +12）
 //
 // 输出：
-//   - precision="day"  → ts 设为该日 12:00（仅日期）
-//   - precision="exact" → ts 带时分（含时辰，或啥都没识别到时回落 = 当前时刻）
+//   - precision="day"    → ts 设为该日 12:00（仅日期）
+//   - precision="daytime" → 仅时段词（中午/下午/晚上），ts 设为时段默认时刻；timePhrase 带原词
+//   - precision="exact"   → 显式 N点 / 啥都没识别（ts = 现在）
 
 const WEEKDAY_CHAR = { "一":1, "二":2, "三":3, "四":4, "五":5, "六":6, "日":7, "天":7 };
 
 /**
- * @returns {{ ts: number, label: string, precision: "day"|"exact" }}
+ * @returns {{ ts: number, label: string, precision: "day"|"daytime"|"exact", timePhrase: string|null }}
  */
 export function voiceExtractDate(text) {
   const now = new Date();
@@ -271,6 +272,8 @@ export function voiceExtractDate(text) {
   let label = "";
   let hour = null;
   let minute = null;
+  let periodWord = null;       // 命中的时段词原文（中午/下午...）
+  let hasExplicitTime = false; // 是否识别到 N点
 
   // 1. 相对日期
   for (const word of Object.keys(TIME_RELATIVE)) {
@@ -321,6 +324,7 @@ export function voiceExtractDate(text) {
     if (text.includes(word)) {
       const [h, m] = TIME_PERIOD[word];
       periodHour = h;
+      periodWord = word;
       hour = h;
       minute = m;
       break;
@@ -337,26 +341,37 @@ export function voiceExtractDate(text) {
     if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
       hour = h;
       minute = m;
+      hasExplicitTime = true;
     }
   }
 
-  // 决定 precision
+  // 决定 precision + timePhrase
   let ts;
   let precision;
-  if (hour != null) {
+  let timePhrase = null;
+  if (hasExplicitTime) {
+    // 显式 N点 → 精确到分（无 timePhrase）
     date.setHours(hour, minute, 0, 0);
     ts = date.getTime();
     precision = "exact";
+  } else if (periodWord) {
+    // 仅时段词（无 N点）→ daytime，UI 显示词而非数字
+    date.setHours(hour, minute, 0, 0);
+    ts = date.getTime();
+    precision = "daytime";
+    timePhrase = periodWord;
   } else if (hasDate) {
+    // 仅日期 → day，ts 设为该日 12:00
     date.setHours(12, 0, 0, 0);
     ts = date.getTime();
     precision = "day";
   } else {
+    // 啥都没识别 → 当前时刻
     ts = now.getTime();
     precision = "exact";
   }
 
-  return { ts, label, precision };
+  return { ts, label, precision, timePhrase };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -505,6 +520,7 @@ export function parseVoiceText(text, options) {
       ts: dateInfo.ts,
       timeLabel: dateInfo.label,
       timePrecision: dateInfo.precision,
+      timePhrase: dateInfo.timePhrase,
       yearOnly: null,
     });
   }

@@ -363,6 +363,7 @@ export function doConfirm() {
     ts:            t.ts,
     timeLabel:     t.timeLabel || "",
     timePrecision: t.timePrecision || "exact",
+    timePhrase:    t.timePhrase || null,  // v2 阶段 4.1：仅时段词时显示原词
   }));
 
   if (toSave.length === 1) {
