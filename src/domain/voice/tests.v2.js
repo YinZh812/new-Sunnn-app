@@ -61,6 +61,13 @@ const CASES = [
   { input: "和朋友AA吃饭120",                                expectAmount: 120,   expectType: "expense", note: "含 AA 不影响金额识别" },
   { input: "借给同事500",                                    expectAmount: 500,   expectType: "expense", note: "含 借给 不影响金额识别" },
   { input: "帮朋友付奶茶18",                                 expectAmount: 18,    expectType: "expense", note: "含 帮XX付 不影响金额识别" },
+
+  // ── 阶段 4：时间识别升级 ──
+  { input: "下午3点喝咖啡18",                                expectAmount: 18,    expectType: "expense", note: "下午3点 → 15:00，precision=exact" },
+  { input: "昨天晚上8点半喝酒20",                            expectAmount: 20,    expectType: "expense", note: "昨天晚上8点半 → 昨天20:30" },
+  { input: "三天前买书50",                                   expectAmount: 50,    expectType: "expense", note: "三天前 → 当前-3 天，precision=day" },
+  { input: "上周三聚餐200",                                  expectAmount: 200,   expectType: "expense", note: "上周三 → 上周对应工作日" },
+  { input: "中午12点吃饭30",                                 expectAmount: 30,    expectType: "expense", note: "中午+12点显式 → 12:00，precision=exact" },
 ];
 
 const MULTI_CASE = "今天加油300，然后超市买了牛奶和面包，还吃了快餐";
@@ -94,6 +101,10 @@ export function runVoiceTestsV2(options = {}) {
       if (ok) passed++;
     }
 
+    const tsD = new Date(r.ts);
+    const tsLabel = r.timePrecision === "exact"
+      ? `${tsD.getMonth()+1}/${tsD.getDate()} ${String(tsD.getHours()).padStart(2,"0")}:${String(tsD.getMinutes()).padStart(2,"0")}`
+      : `${tsD.getMonth()+1}/${tsD.getDate()} (day)`;
     rows.push({
       "输入": c.input,
       "金额": r.amount,
@@ -101,6 +112,7 @@ export function runVoiceTestsV2(options = {}) {
       "类型": r.type,
       "✓类型": typeOk ? "✓" : "✗",
       "类别": r.category,
+      "时间": tsLabel,
       "描述": r.desc,
       "备注": c.note + (c.knownEdge ? " [known edge]" : ""),
     });

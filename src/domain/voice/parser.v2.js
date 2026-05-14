@@ -23,6 +23,8 @@ import {
   VOICE_SAVINGS_KW,
   TOTAL_WORDS,
   QUANTIFIERS,
+  TIME_RELATIVE,
+  TIME_PERIOD,
 } from "./dictionary.v2.js";
 import { preprocess } from "./preprocess.js";
 
@@ -187,12 +189,16 @@ export function voiceExtractAmount(text) {
   }
 
   // v2 阶段 3.5：量词从 dict 驱动（取代 v1 的硬编码组）
+  // v2 阶段 4：时间 "N点N分"/"N点半" 也要剥（不然 "下午3点20分喝咖啡18" 会把 20 当金额）
   const quantifierGroup = QUANTIFIERS.map((q) => q.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")).join("|");
   const cleanText = text
     .replace(/\d{1,4}\s*年/g, " ")
     .replace(/\d{1,2}\s*月/g, " ")
     .replace(/\d{1,2}\s*[号日]/g, " ")
-    .replace(/\d{1,2}\s*[点时]/g, " ")
+    .replace(/\d{1,2}\s*点\s*半/g, " ")             // 3点半
+    .replace(/\d{1,2}\s*点\s*\d{1,2}\s*分?/g, " ") // 3点20[分]
+    .replace(/\d{1,2}\s*[点时]/g, " ")              // 裸 3点
+    .replace(/\d+\s*天\s*前/g, " ")                 // 5天前 (CN 版无 \d)
     .replace(new RegExp(`(\\d+)\\s*(?:${quantifierGroup})`, "g"), " ");
   const allNums = [];
   const re2 = /(\d+(?:\.\d+)?)/g;
@@ -219,7 +225,13 @@ export function voiceCleanDesc(text) {
   let desc = text;
   desc = desc.replace(/^(?:还有|然后|另外|再加|再有|外加|顺便|顺手|顺道|接着|紧接着|跟着|紧跟着|之后|后来|随后|跟住|继续|再来|又来|再去|又去|末了|最后|另|and then|then)\s*/i, "");
   desc = desc.replace(/^(?:还|又|再)\s*/, "");
-  desc = desc.replace(/^(?:今天|昨天|前天|今日)\s*/, "");
+  // v2 阶段 4：时间前缀按从粗到细顺序剥离
+  desc = desc.replace(/^(?:今天|昨天|前天|今日|昨日|明天|后天)\s*/, "");
+  desc = desc.replace(/^(?:\d+|[零一二两三四五六七八九十百千万]+)\s*天\s*前\s*/, "");
+  desc = desc.replace(/^上(?:周|星期)[一二三四五六日天]\s*/, "");
+  desc = desc.replace(/^\d{1,2}\s*月\s*\d{1,2}\s*[号日]\s*/, "");
+  desc = desc.replace(/^(?:早上|上午|中午|下午|傍晚|晚上|半夜|凌晨)\s*/, "");
+  desc = desc.replace(/^\d{1,2}\s*点\s*(?:半|\d{1,2}\s*分?)?\s*/, "");
   desc = desc.replace(/\s*\d+(?:\.\d+)?(?:\s*[+＋]\s*\d+(?:\.\d+)?)?\s*(?:rmb|欧|欧元|元|块|块钱|€|¥|￥|\$)?\s*$/i, "");
   // v2 阶段 3：剥离末尾的中文金额
   //   1) 带 块/元 单位：三块五 / 十二块八 / 三十块（钱）
@@ -231,30 +243,120 @@ export function voiceCleanDesc(text) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 日期识别
+// 日期/时间识别（v2 阶段 4 升级）
 // ─────────────────────────────────────────────────────────────────────────────
+//
+// 支持模式：
+//   - 相对日期：今天/昨天/前天/明天/后天/今日/昨日（来自 TIME_RELATIVE）
+//   - 绝对日期：M月D日 / M月D号
+//   - N天前：三天前 / 5天前（限 1–365）
+//   - 上周X / 上星期X：上周一~上周日（"日"="天"=7）
+//   - 时段词：早上/上午/中午/下午/傍晚/晚上/半夜/凌晨（来自 TIME_PERIOD）
+//   - 显式时辰：3点 / 3点20[分] / 3点半
+//   - 组合：昨天下午3点 / 晚上8点半（period 在 PM 时把 N点 1-11 推 +12）
+//
+// 输出：
+//   - precision="day"  → ts 设为该日 12:00（仅日期）
+//   - precision="exact" → ts 带时分（含时辰，或啥都没识别到时回落 = 当前时刻）
 
+const WEEKDAY_CHAR = { "一":1, "二":2, "三":3, "四":4, "五":5, "六":6, "日":7, "天":7 };
+
+/**
+ * @returns {{ ts: number, label: string, precision: "day"|"exact" }}
+ */
 export function voiceExtractDate(text) {
   const now = new Date();
-  let base = new Date();
+  let date = new Date(now);
+  let hasDate = false;
   let label = "";
+  let hour = null;
+  let minute = null;
 
-  if (/昨天|昨日|昨儿/.test(text)) {
-    base.setDate(base.getDate() - 1);
-    label = `${base.getMonth() + 1}月${base.getDate()}日`;
-  } else if (/前天/.test(text)) {
-    base.setDate(base.getDate() - 2);
-    label = `${base.getMonth() + 1}月${base.getDate()}日`;
-  } else if (/今天|今日|今儿/.test(text)) {
-    label = `${now.getMonth() + 1}月${now.getDate()}日`;
+  // 1. 相对日期
+  for (const word of Object.keys(TIME_RELATIVE)) {
+    if (text.includes(word)) {
+      date.setDate(date.getDate() + TIME_RELATIVE[word]);
+      hasDate = true;
+      label = `${date.getMonth() + 1}月${date.getDate()}日`;
+      break;
+    }
   }
 
+  // 2. N 天前（Arabic 优先 → Chinese）
+  const arAgo = text.match(/(\d+)\s*天前/);
+  const cnAgo = text.match(/([零一二两三四五六七八九十百千万]+)\s*天前/);
+  let daysAgo = null;
+  if (arAgo) daysAgo = parseInt(arAgo[1]);
+  else if (cnAgo) daysAgo = parseChineseInt(cnAgo[1]);
+  if (daysAgo != null && daysAgo > 0 && daysAgo < 365) {
+    date = new Date(now);
+    date.setDate(date.getDate() - daysAgo);
+    hasDate = true;
+    label = `${date.getMonth() + 1}月${date.getDate()}日`;
+  }
+
+  // 3. 上周X / 上星期X
+  const lwM = text.match(/上(?:周|星期)([一二三四五六日天])/);
+  if (lwM) {
+    const targetDow = WEEKDAY_CHAR[lwM[1]];
+    const todayDow = now.getDay() === 0 ? 7 : now.getDay();
+    const offset = -(todayDow - 1) - 7 + (targetDow - 1);
+    date = new Date(now);
+    date.setDate(date.getDate() + offset);
+    hasDate = true;
+    label = `${date.getMonth() + 1}月${date.getDate()}日`;
+  }
+
+  // 4. 绝对日期 M月D日
   const fd = text.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*[号日]/);
   if (fd) {
-    base = new Date(now.getFullYear(), parseInt(fd[1]) - 1, parseInt(fd[2]), 12);
+    date = new Date(now.getFullYear(), parseInt(fd[1]) - 1, parseInt(fd[2]));
+    hasDate = true;
     label = `${fd[1]}月${fd[2]}日`;
   }
-  return { ts: base.getTime(), label };
+
+  // 5. 时段词（中午/下午/晚上...）
+  let periodHour = null;
+  for (const word of Object.keys(TIME_PERIOD)) {
+    if (text.includes(word)) {
+      const [h, m] = TIME_PERIOD[word];
+      periodHour = h;
+      hour = h;
+      minute = m;
+      break;
+    }
+  }
+
+  // 6. 显式 N点 / N点N分 / N点半
+  const tM = text.match(/(\d{1,2})\s*点(?:\s*半|\s*(\d{1,2})\s*分?)?/);
+  if (tM) {
+    let h = parseInt(tM[1]);
+    let m = tM[0].includes("半") ? 30 : (tM[2] ? parseInt(tM[2]) : 0);
+    // 时段 + N点 组合：下午 + 3点 → 15:00
+    if (periodHour != null && periodHour >= 12 && h < 12) h += 12;
+    if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+      hour = h;
+      minute = m;
+    }
+  }
+
+  // 决定 precision
+  let ts;
+  let precision;
+  if (hour != null) {
+    date.setHours(hour, minute, 0, 0);
+    ts = date.getTime();
+    precision = "exact";
+  } else if (hasDate) {
+    date.setHours(12, 0, 0, 0);
+    ts = date.getTime();
+    precision = "day";
+  } else {
+    ts = now.getTime();
+    precision = "exact";
+  }
+
+  return { ts, label, precision };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -402,7 +504,7 @@ export function parseVoiceText(text, options) {
       desc,
       ts: dateInfo.ts,
       timeLabel: dateInfo.label,
-      timePrecision: dateInfo.label ? "day" : "exact",
+      timePrecision: dateInfo.precision,
       yearOnly: null,
     });
   }
