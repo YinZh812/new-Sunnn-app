@@ -57,10 +57,10 @@ const CASES = [
   { input: "麦当劳套餐45",                                   expectAmount: 45,    expectType: "expense", note: "知名品牌 → 餐饮" },
   { input: "转账给我500",                                    expectAmount: 500,   expectType: "income",  note: "转账给我 → income" },
 
-  // ── 阶段 3.5：社交识别（结果挂在 result.social，不影响 amount/type） ──
-  { input: "和朋友AA吃饭120",                                expectAmount: 120,   expectType: "expense", note: "AA 检测 → social.type=AA" },
-  { input: "借给同事500",                                    expectAmount: 500,   expectType: "expense", note: "借出 → social.type=lend" },
-  { input: "帮朋友付奶茶18",                                 expectAmount: 18,    expectType: "expense", note: "代付 → social.type=pay_for" },
+  // ── 多人/借贷场景（仅验证 amount/type 不被破坏；social 字段已移除） ──
+  { input: "和朋友AA吃饭120",                                expectAmount: 120,   expectType: "expense", note: "含 AA 不影响金额识别" },
+  { input: "借给同事500",                                    expectAmount: 500,   expectType: "expense", note: "含 借给 不影响金额识别" },
+  { input: "帮朋友付奶茶18",                                 expectAmount: 18,    expectType: "expense", note: "含 帮XX付 不影响金额识别" },
 ];
 
 const MULTI_CASE = "今天加油300，然后超市买了牛奶和面包，还吃了快餐";
@@ -101,8 +101,6 @@ export function runVoiceTestsV2(options = {}) {
       "类型": r.type,
       "✓类型": typeOk ? "✓" : "✗",
       "类别": r.category,
-      "商家": r.merchant || "—",
-      "社交": r.social ? r.social.type : "—",
       "描述": r.desc,
       "备注": c.note + (c.knownEdge ? " [known edge]" : ""),
     });
