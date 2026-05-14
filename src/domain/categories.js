@@ -6,19 +6,23 @@
 //
 // 现役 UI 用新的；分析页/历史 CSV 导入仍可能见到旧的，所以两套都保留。
 
-export const CAT_DEFAULTS_VERSION = "2026-04-28-v2";
+export const CAT_DEFAULTS_VERSION = "2026-05-14-v3";
 
 /**
  * 按类型分组的默认类别。手动记账面板按 mType 选取这里的列表，
  * 末尾会再追加一个"设置"按钮（UI 层负责）。
  *
  * 这是当前 UI 主用的"新分类组"。
+ *
+ * 2026-05-14 v3：把 v2 的"吃/买/车"三个单字名换成更通用的"餐饮/购物/交通"，
+ * 让其他用户使用时不被作者的个人偏好命名困扰。版本号 bump 触发本地
+ * customCategoriesByType 重置 + 已存 tx 的 category 字段一次性重命名。
  */
 export const DEFAULT_CATS_BY_TYPE = {
   expense: [
-    { name: "吃",   icon: "lucide:utensils" },
-    { name: "买",   icon: "lucide:shopping-bag" },
-    { name: "车",   icon: "lucide:car" },
+    { name: "餐饮", icon: "lucide:utensils" },
+    { name: "购物", icon: "lucide:shopping-bag" },
+    { name: "交通", icon: "lucide:car" },
     { name: "运动", icon: "lucide:dumbbell" },
     { name: "其他", icon: "lucide:package" },
   ],
@@ -41,13 +45,44 @@ export const LEGACY_CAT_LIST = [
   "餐饮","超市","购物","交通","运动","娱乐","医疗","生活","工资","储蓄","彩票","其他",
 ];
 
-/** 旧分类 → Lucide 图标名 */
+/** 旧分类 → Lucide 图标名（含 v2→v3 重命名前的旧名兜底，确保历史 tx 仍能正确显示图标） */
 export const LEGACY_CAT_LUCIDE = {
-  "餐饮":"coffee","超市":"store","购物":"shopping-bag","交通":"car",
+  "餐饮":"utensils","超市":"store","购物":"shopping-bag","交通":"car",
   "运动":"dumbbell","娱乐":"film","医疗":"heart-pulse","生活":"home",
   "工资":"wallet","储蓄":"piggy-bank","彩票":"ticket","其他":"package",
-  "吃":"utensils","玩":"gamepad-2",
+  // v2 旧默认名（已被 v3 重命名替换；保留以兼容历史 tx / 用户旧 customCategories）
+  "吃":"utensils","买":"shopping-bag","车":"car",
+  "玩":"gamepad-2",
 };
+
+// ── v2 → v3 重命名映射（用于已存 tx 迁移） ─────────────────────────────────
+//
+// 这次重命名是因为单字名"吃/买/车"是作者个人偏好，对其他人不友好。
+// migrateLegacyTxCategoryNames 在 store.hydrate 里调一次，把已存 tx 的
+// category 字段全局替换。一次性副作用，幂等。
+
+export const CATEGORY_RENAME_V3 = Object.freeze({
+  "吃": "餐饮",
+  "买": "购物",
+  "车": "交通",
+});
+
+/**
+ * 把 tx 数组里旧名 category 替换成新名。返回 { changed, txs }。
+ * @param {Array} txs
+ */
+export function migrateLegacyTxCategoryNames(txs) {
+  if (!Array.isArray(txs) || txs.length === 0) return { changed: false, txs };
+  let changed = false;
+  const out = txs.map((t) => {
+    if (t && t.category && CATEGORY_RENAME_V3[t.category]) {
+      changed = true;
+      return { ...t, category: CATEGORY_RENAME_V3[t.category] };
+    }
+    return t;
+  });
+  return { changed, txs: out };
+}
 
 /** 旧分类 → 着色（分析页饼图、排行榜进度条） */
 export const LEGACY_CAT_COLOR = {

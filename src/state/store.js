@@ -24,7 +24,10 @@ import {
   loadUserName, saveUserName as persistUserName,
 } from "./storage.js";
 
-import { CAT_DEFAULTS_VERSION, DEFAULT_CATS_BY_TYPE, getDefaultCatsByType } from "../domain/categories.js";
+import {
+  CAT_DEFAULTS_VERSION, DEFAULT_CATS_BY_TYPE, getDefaultCatsByType,
+  migrateLegacyTxCategoryNames,
+} from "../domain/categories.js";
 import { DEFAULT_EUR_TO_CNY } from "../domain/currency.js";
 
 // ── 默认值 ──────────────────────────────────────────────────────────────────
@@ -93,6 +96,22 @@ function hydrate() {
   state.budgets     = loadBudgets() ?? {};
   state.goals       = loadGoals() ?? [];
   state.deletedSugs = loadDeletedSugs() ?? [];
+
+  // 2026-05-14 v3：一次性把已存 tx 的 category 从旧名（吃/买/车）改成新名（餐饮/购物/交通）。
+  // 用 localStorage flag 兜底防止重跑。Supabase 同步会自然把新名推上云，多设备各自一次性迁移即可。
+  const MIGRATION_FLAG = "txCategoryRenamedV3";
+  try {
+    if (localStorage.getItem(MIGRATION_FLAG) !== "1") {
+      const { changed, txs } = migrateLegacyTxCategoryNames(state.txs);
+      if (changed) {
+        state.txs = txs;
+        persistTxs(state.txs);
+      }
+      localStorage.setItem(MIGRATION_FLAG, "1");
+    }
+  } catch (err) {
+    console.warn("[store] tx category rename v3 migration failed:", err);
+  }
 
   const savedSettings = loadSettings();
   state.settings = savedSettings
