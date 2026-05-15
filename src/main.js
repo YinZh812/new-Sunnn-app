@@ -286,7 +286,12 @@ function hookInlineSaves() {
 
   wrap("saveTxs",      () => window.txs,      (v) => store.setTxs(Array.isArray(v) ? v : []));
   wrap("saveSettings", () => window.settings, (v) => store.setSettings(v || {}));
-  // 低频字段（budgets/goals/deletedSugs/customCategoriesByType）等真正的模块需要时再加。
+  // 用户在 inline 的 cat 设置 UI 里改/重排类别时，把变更也同步到 store →
+  // 触发 cats:changed → manual.js / detail.js 等订阅者重渲染。
+  wrap("saveCustomCategories",
+       () => window.customCategoriesByType,
+       (v) => store.setCustomCategoriesByType(v || { expense: [], income: [], savings: [] }));
+  // 低频字段（budgets/goals/deletedSugs）等真正的模块需要时再加。
 }
 
 // ── 桥接 applyTheme：让 inline 调用走模块版 ─────────────────────────────────

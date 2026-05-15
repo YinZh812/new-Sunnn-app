@@ -54,6 +54,12 @@ export function init({ toast } = {}) {
     saveDraft();
     closeOverlay(OVERLAY_ID);
   });
+  // 类别管理（增删改 / 重排）变化时，把手动记账面板里的类别行/网格重建一遍。
+  // 即便面板当前未打开也重建无害（DOM 节点常驻），重新打开时已是最新顺序。
+  store.on("cats:changed", () => {
+    if (byId("manualCatRow")) buildManualCatRow();
+    if (byId("catgrid")) buildCatGrid();
+  });
 }
 
 // ── 打开 / 关闭 ────────────────────────────────────────────────────────────

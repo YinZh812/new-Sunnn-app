@@ -49,6 +49,14 @@ export function init({ manualModal, toast } = {}) {
   _manualModal = manualModal || null;
   if (toast) _toast = toast;
   attachSheetSwipe(SHEET_ID, HANDLE_ID, close);
+  // 类别管理变化时：如果详情面板的类别网格当前正打开，重新渲染一遍刷新顺序。
+  store.on("cats:changed", () => {
+    const wrap = byId("dt-cat-grid-wrap");
+    if (!wrap || wrap.style.display === "none") return;
+    // 暂时隐藏 → 调 detailEditCat 让它走"未打开 → 打开"路径重新构建
+    wrap.style.display = "none";
+    detailEditCat();
+  });
 }
 
 // ── 打开 / 关闭 ────────────────────────────────────────────────────────────
@@ -92,7 +100,17 @@ export function renderDetailBody() {
         '<span class="sv2" style="display:inline-flex;align-items:center;gap:6px">' +
           '<span class="dt-cat-ico">' + ico + '</span><span id="dt-cat-disp">' + escapeHtml(t.category) + '</span>' +
         '</span></div>' +
-      '<div id="dt-cat-grid-wrap" style="display:none;background:var(--card);padding:10px 12px"><div class="conf-cat-wrap" id="dt-cat-grid"></div></div>' +
+      '<div id="dt-cat-grid-wrap" style="display:none;background:var(--card);padding:10px 12px 44px;position:relative">' +
+        '<div class="conf-cat-wrap" id="dt-cat-grid"></div>' +
+        // 右下角齿轮：打开类别管理（编辑顺序/图标/增删）
+        '<div onclick="event.stopPropagation();openCatSettings()" title="管理类别" ' +
+             'style="position:absolute;right:10px;bottom:8px;width:30px;height:30px;border-radius:50%;background:var(--bdr2);color:var(--t2);display:flex;align-items:center;justify-content:center;cursor:pointer">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+            '<circle cx="12" cy="12" r="3"/>' +
+            '<path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>' +
+          '</svg>' +
+        '</div>' +
+      '</div>' +
       '<div class="srow srow-edit" onclick="detailEditType()"><span class="sk">类型</span><span class="sv2" id="dt-type-disp">' + typeL(t.type) + '</span></div>' +
       '<div class="srow srow-edit" onclick="detailEditCur()"><span class="sk">货币</span><span class="sv2" id="dt-cur-disp">' + (t.currency === "CNY" ? "人民币 ¥" : "欧元 €") + '</span></div>' +
       '<div class="srow"><span class="sk">时间</span><span class="sv2">' + formatTransactionFull(t) + '</span></div>' +
