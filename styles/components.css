@@ -515,9 +515,12 @@ body{font-family:var(--font-app);color:var(--t1);-webkit-font-smoothing:antialia
 .manual-cur-toggle{position:absolute;left:10px;top:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:var(--card-alt);border:1px solid var(--bdr);border-radius:50%;color:var(--t1);font-size:15px;font-weight:600;cursor:pointer;user-select:none;line-height:1;font-family:var(--font-digit);padding:0}
 .manual-cur-toggle:active{opacity:.6}
 
-/* 设置页"启用货币" pills 的锁定态：CNY 不能取消，加 cursor:default + 副标 */
-.seg-btn.seg-btn-locked{cursor:default;opacity:.85;position:relative}
-.seg-btn.seg-btn-locked::after{content:"\1F512";position:absolute;right:-2px;top:-4px;font-size:8px;opacity:.7}
+/* 设置页 货币与汇率卡：每个币种独占一行的开关行 */
+.cur-row{display:flex;align-items:center;padding:10px 16px;gap:10px;cursor:pointer;border-top:1px solid var(--bdr);user-select:none;background:var(--card)}
+.cur-row:first-of-type{border-top:1px solid var(--bdr)}
+.cur-row:active{background:var(--card-alt)}
+.cur-row .cur-rate-inp{background:var(--card-alt);border:1px solid var(--bdr);border-radius:6px;color:var(--t1);font-family:var(--font-digit);outline:none}
+.cur-row .cur-rate-inp:focus{border-color:var(--acc)}
 
 .manual-combo{background:var(--card-alt);overflow:hidden;border:0;margin:8px -16px 0;border-radius:0;padding-bottom:env(safe-area-inset-bottom)}
 .manual-combo:focus-within{border-color:var(--acc)}

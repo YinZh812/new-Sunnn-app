@@ -11,9 +11,16 @@ import { openOverlay, closeOverlay, attachSheetSwipe } from "../components/overl
 import { fxTap, fxOpen } from "../components/sfx.js";
 import { store } from "../../state/store.js";
 import { getCategoryIcon, DEFAULT_CATS_BY_TYPE } from "../../domain/categories.js";
+import { SUPPORTED_CURRENCIES } from "../../domain/currency.js";
 import { renderIcon } from "../../utils/icons.js";
 import { formatTransactionFull } from "../../domain/dates.js";
-import { escapeHtml, formatAmount } from "../../utils/format.js";
+import { escapeHtml, formatAmount, currencySymbol } from "../../utils/format.js";
+
+// 货币代码 → "中文名 符号"（如 "欧元 €" / "人民币 ¥" / "美元 $"）
+function curDisplay(code) {
+  const ccy = SUPPORTED_CURRENCIES.find((c) => c.code === code);
+  return ccy ? ccy.label + " " + ccy.symbol : (code || "");
+}
 
 const OVERLAY_ID = "ov-detail";
 const SHEET_ID   = "sh-detail";
@@ -88,7 +95,7 @@ export function renderDetailBody() {
 
   const ico = getCatIcon(t.category);
   const sg = t.type === "expense" ? "−" : "+";
-  const sym = t.currency === "CNY" ? "¥" : "€";
+  const sym = currencySymbol(t.currency);
 
   body.innerHTML =
     '<div style="font-size:34px;font-weight:700;text-align:center;letter-spacing:-2px;margin-bottom:14px;color:var(--t1)">' +
@@ -106,7 +113,7 @@ export function renderDetailBody() {
         '<div class="conf-cat-wrap" id="dt-cat-grid" style="position:relative;padding-bottom:42px"></div>' +
       '</div>' +
       '<div class="srow srow-edit" onclick="detailEditType()"><span class="sk">类型</span><span class="sv2" id="dt-type-disp">' + typeL(t.type) + '</span></div>' +
-      '<div class="srow srow-edit" onclick="detailEditCur()"><span class="sk">货币</span><span class="sv2" id="dt-cur-disp">' + (t.currency === "CNY" ? "人民币 ¥" : "欧元 €") + '</span></div>' +
+      '<div class="srow srow-edit" onclick="detailEditCur()"><span class="sk">货币</span><span class="sv2" id="dt-cur-disp">' + escapeHtml(curDisplay(t.currency)) + '</span></div>' +
       '<div class="srow"><span class="sk">时间</span><span class="sv2">' + formatTransactionFull(t) + '</span></div>' +
     '</div>';
 }
@@ -188,7 +195,14 @@ export function detailEditCur() {
   const t = txs[detailIdx];
   if (!t) return;
   fxTap();
-  t.currency = t.currency === "CNY" ? "EUR" : "CNY";
+  // 在 settings.enabledCurrencies 之间循环（跟 Hero / 手动按钮一致）
+  const settings = store.getSettings();
+  const enabled = Array.isArray(settings.enabledCurrencies) && settings.enabledCurrencies.length
+    ? settings.enabledCurrencies
+    : ["EUR", "CNY"];
+  let i = enabled.indexOf(t.currency);
+  if (i < 0) i = -1;
+  t.currency = enabled[(i + 1) % enabled.length];
   _saveTxsAndRefresh(txs);
 }
 
@@ -226,7 +240,7 @@ export function confirmDelete(id) {
 
   const t = txs[id];
   const sg = t.type === "expense" ? "−" : "+";
-  const sym = t.currency === "CNY" ? "¥" : "€";
+  const sym = currencySymbol(t.currency);
   const body = byId("deleteConfirmBody");
   if (body) {
     body.innerHTML =

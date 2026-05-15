@@ -1207,38 +1207,68 @@ function renderCurrencyCard(s) {
   const rates = s.ratesToCny || {};
   const defCur = s.defaultCurrency || enabled[0];
 
-  // 默认货币 dropdown：列出已启用币种
-  const dropOpts = enabled.map((code) => {
-    const ccy = SUPPORTED_CURRENCIES.find((c) => c.code === code);
-    if (!ccy) return "";
-    return '<option value="' + code + '"' + (code === defCur ? " selected" : "") + '>' +
-             escapeHtml(ccy.label) + ' ' + ccy.symbol + ' (' + code + ')' +
+  // 1) 默认货币 dropdown：列出全部 5 个币种。选不在 enabled 列表里的，自动启用之。
+  const dropOpts = SUPPORTED_CURRENCIES.map((ccy) => {
+    return '<option value="' + ccy.code + '"' + (ccy.code === defCur ? " selected" : "") + '>' +
+             escapeHtml(ccy.label) + '  ' + ccy.symbol +
            '</option>';
   }).join("");
 
-  // 启用货币 pill 列表
-  const enablePills = SUPPORTED_CURRENCIES.map((ccy) => {
+  // 2) 货币行列表（每个币种独占一行 → 触感清晰）
+  //    左：符号+名字；中：状态文字（基准 / 关 / 1 X = ¥）；右：开关圆点。
+  //    点击整行切换 enable（CNY 锁定）。
+  const rows = SUPPORTED_CURRENCIES.map((ccy) => {
     const isEnabled = enabled.includes(ccy.code);
     const isCny = ccy.code === "CNY";
-    const cls = "seg-btn" + (isEnabled ? " sel" : "") + (isCny ? " seg-btn-locked" : "");
-    const click = isCny ? "" : ' onclick="toggleEnabledCurrency(\'' + ccy.code + '\')"';
-    return '<div class="' + cls + '" data-v="' + ccy.code + '"' + click + '>' +
-             ccy.symbol + ' ' + escapeHtml(ccy.label) +
-           '</div>';
-  }).join("");
+    const isDefault = ccy.code === defCur;
 
-  // 汇率输入：仅 enabled 中非 CNY 的
-  const rateRows = enabled.filter((c) => c !== "CNY").map((code) => {
-    const ccy = SUPPORTED_CURRENCIES.find((c) => c.code === code);
-    if (!ccy) return "";
-    const val = rates[code] != null ? rates[code] : "";
+    // 右侧开关圆点（CNY 显示"基准"小标，不可切换）
+    let toggleHtml;
+    if (isCny) {
+      toggleHtml = '<span style="font-size:10px;color:var(--t3);padding:4px 8px;border-radius:10px;background:var(--bdr2)">基准</span>';
+    } else {
+      const dotBg = isEnabled ? "var(--acc)" : "var(--bdr2)";
+      const dotPos = isEnabled ? "right:3px" : "left:3px";
+      toggleHtml =
+        '<span style="position:relative;width:36px;height:20px;border-radius:10px;background:' + dotBg + ';transition:background .15s;display:inline-block;flex-shrink:0">' +
+          '<span style="position:absolute;' + dotPos + ';top:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s,right .15s"></span>' +
+        '</span>';
+    }
+
+    // 中间状态：基准 / 1 X = ___ ¥ / 关
+    let middleHtml = "";
+    if (isCny) {
+      // 没东西
+    } else if (isEnabled) {
+      const val = rates[ccy.code] != null ? rates[ccy.code] : "";
+      middleHtml =
+        '<span style="font-size:11px;color:var(--t3);margin:0 8px;display:inline-flex;align-items:center;gap:4px">' +
+          '1 ' + ccy.symbol + ' =' +
+          '<input type="number" class="set-input cur-rate-inp" step="0.01" min="0" ' +
+                 'value="' + val + '" placeholder="汇率" ' +
+                 'onclick="event.stopPropagation()" ' +
+                 'oninput="setRateForCurrency(\'' + ccy.code + '\',this.value)" ' +
+                 'style="width:70px;margin:0 2px;padding:4px 8px;font-size:11px;text-align:right">' +
+          '<span>¥</span>' +
+        '</span>';
+    } else {
+      middleHtml = '<span style="font-size:11px;color:var(--t3);margin:0 8px">未启用</span>';
+    }
+
+    const rowClick = isCny ? "" : ' onclick="toggleEnabledCurrency(\'' + ccy.code + '\')"';
+    const defBadge = isDefault
+      ? '<span style="font-size:10px;color:var(--acc);margin-left:6px">默认</span>'
+      : "";
+
     return (
-      '<div class="set-row">' +
-        '<div class="set-label">1 ' + ccy.symbol + ' ' + escapeHtml(ccy.label) + ' =</div>' +
-        '<input type="number" class="set-input" style="max-width:110px" step="0.01" min="0" ' +
-               'value="' + val + '" ' +
-               'oninput="setRateForCurrency(\'' + code + '\',this.value)">' +
-        '<span style="color:var(--t3);margin-left:6px">¥ CNY</span>' +
+      '<div class="cur-row"' + rowClick + '>' +
+        '<div style="display:flex;align-items:center;gap:8px;flex:0 0 auto">' +
+          '<span style="font-size:14px;color:var(--t1);font-weight:500;width:18px;text-align:center">' + ccy.symbol + '</span>' +
+          '<span style="font-size:12px;color:var(--t1)">' + escapeHtml(ccy.label) + '</span>' +
+          defBadge +
+        '</div>' +
+        '<div style="flex:1;text-align:right">' + middleHtml + '</div>' +
+        toggleHtml +
       '</div>'
     );
   }).join("");
@@ -1246,56 +1276,55 @@ function renderCurrencyCard(s) {
   return (
     '<div class="set-card">' +
       '<div class="set-title">货币与汇率</div>' +
-      // 1. 默认货币 dropdown
+      // 1) 默认货币（dropdown，全部 5 个，可选不在启用里的会自动启用）
       '<div class="set-row">' +
-        '<div class="set-label">默认货币</div>' +
-        '<select class="set-input" style="max-width:160px" onchange="setDefCurFromSelect(this)">' +
+        '<div class="set-label">默认货币<br/>' +
+          '<span style="font-size:10px;color:var(--t3);font-weight:400">新建交易用</span>' +
+        '</div>' +
+        '<select class="set-input" style="max-width:170px;cursor:pointer" onchange="setDefCurFromSelect(this)">' +
           dropOpts +
         '</select>' +
       '</div>' +
-      // 2. 启用货币
-      '<div class="set-row" style="display:block;padding-top:4px">' +
-        '<div class="set-label" style="margin-bottom:8px">启用货币 ' +
-          '<span style="color:var(--t3);font-size:10px;font-weight:400">（人民币为基准，必选）</span>' +
-        '</div>' +
-        '<div style="display:flex;flex-wrap:wrap;gap:6px">' + enablePills + '</div>' +
+      // 2) 启用货币列表
+      '<div style="padding:6px 14px 4px;font-size:11px;color:var(--t3);line-height:1.6">' +
+        '点击下方某行切换启用。启用的货币会进入手动记账和 Hero 切换按钮的循环；汇率以 ¥ 人民币为基准。' +
       '</div>' +
-      // 3. 汇率
-      (rateRows ? '<div style="height:1px;background:var(--bdr);margin:6px 0 4px"></div>' + rateRows : "") +
+      '<div style="display:flex;flex-direction:column">' + rows + '</div>' +
     '</div>'
   );
 }
 
-/** onchange handler：默认货币下拉切换。 */
+/** onchange handler：默认货币下拉切换。若选了未启用的币种则自动启用之。 */
 export function setDefCurFromSelect(el) {
   if (!el) return;
   fxTap();
   const code = el.value;
-  store.setSettings({ defaultCurrency: code });
+  const s = store.getSettings();
+  const enabled = Array.isArray(s.enabledCurrencies) ? s.enabledCurrencies.slice() : ["EUR", "CNY"];
+  const patch = { defaultCurrency: code };
+  if (!enabled.includes(code)) {
+    enabled.push(code);
+    patch.enabledCurrencies = enabled;
+  }
+  store.setSettings(patch);
 }
 
-/** onclick handler：启用/禁用某币种。CNY 永远启用。 */
+/** 点击行 → 切换该币种启用状态。CNY 永远启用。 */
 export function toggleEnabledCurrency(code) {
-  if (code === "CNY") return; // 防御性兜底（HTML 已不挂 onclick）
+  if (code === "CNY") return;
   const s = store.getSettings();
   const enabled = Array.isArray(s.enabledCurrencies) ? s.enabledCurrencies.slice() : ["EUR", "CNY"];
   const i = enabled.indexOf(code);
   if (i >= 0) {
-    // 禁用：至少保留 1 个非 CNY？其实最低保留 CNY 即可
-    if (enabled.length <= 1) {
-      _toast("至少要保留一种货币");
-      return;
-    }
+    if (enabled.length <= 1) { _toast("至少要保留一种货币"); return; }
     enabled.splice(i, 1);
   } else {
     enabled.push(code);
   }
-  // CNY 兜底加回去
   if (!enabled.includes("CNY")) enabled.push("CNY");
 
   fxTap();
   const patch = { enabledCurrencies: enabled };
-  // 若禁用了当前 defaultCurrency / displayCurrency，回落到第一个启用项
   if (!enabled.includes(s.defaultCurrency)) patch.defaultCurrency = enabled[0];
   if (!enabled.includes(s.displayCurrency)) patch.displayCurrency = enabled[0];
   store.setSettings(patch);
@@ -1305,7 +1334,7 @@ export function toggleEnabledCurrency(code) {
 export function setRateForCurrency(code, value) {
   if (code === "CNY") return;
   const n = parseFloat(value);
-  if (!Number.isFinite(n) || n <= 0) return; // 忽略非法值，让用户继续输入
+  if (!Number.isFinite(n) || n <= 0) return;
   const s = store.getSettings();
   const next = { ...(s.ratesToCny || {}), [code]: n };
   store.setSettings({ ratesToCny: next });
