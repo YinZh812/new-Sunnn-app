@@ -12,8 +12,9 @@
 import { byId } from "../../utils/dom.js";
 import { store } from "../../state/store.js";
 import { isInMonth } from "../../domain/dates.js";
-import { safeRate, toEur, totalSavingsInEur } from "../../domain/currency.js";
+import { txToCny, convertAmount, sumByTypeInCny } from "../../domain/currency.js";
 import { LEGACY_CAT_COLOR, getCategoryIcon } from "../../domain/categories.js";
+import { currencySymbol } from "../../utils/format.js";
 import { fxTab } from "../components/sfx.js";
 import { getViewYear, getViewMonth } from "./main.js";
 
@@ -24,10 +25,11 @@ const CIRC = 2 * Math.PI * PIE_RADIUS;
 let _analysisTab = "expense"; // "expense" | "income"
 
 export function init() {
-  // 切月、删交易、新增交易等数据变化时若分析页可见则刷新
-  store.on("txs:changed",     maybeRefresh);
-  store.on("budgets:changed", maybeRefresh);
-  store.on("goals:changed",   maybeRefresh);
+  // 切月、删交易、新增交易、改默认货币/汇率等数据变化时，若分析页可见则刷新
+  store.on("txs:changed",      maybeRefresh);
+  store.on("budgets:changed",  maybeRefresh);
+  store.on("goals:changed",    maybeRefresh);
+  store.on("settings:changed", maybeRefresh);
 }
 
 /** nav 切到本 tab 时调（已在 main.js 注册）。 */
@@ -64,7 +66,10 @@ export function render() {
   const budgets  = store.getBudgets();
   const goals    = store.getGoals();
   const customByType = store.getCustomCategoriesByType();
-  const rate     = safeRate(settings.eurToCny);
+  const rates    = settings.ratesToCny || {};
+  // 分析页所有金额：用"默认货币"（设置页里选的）来显示
+  const dispCur  = settings.defaultCurrency || "CNY";
+  const dispSym  = currencySymbol(dispCur);
 
   const viewYear  = getViewYear();
   const viewMonth = getViewMonth();
@@ -76,11 +81,15 @@ export function render() {
   const typeLabel  = isIncome ? "收入" : "支出";
   const emptyMsg   = isIncome ? "本月暂无收入记录" : "本月暂无支出记录";
 
-  // 按类别累计
+  // 按类别累计（先聚合 CNY，再统一转 dispCur）
   const rows = mo.filter((t) => typeFilter.includes(t.type));
-  const catTotals = {};
+  const catTotalsCny = {};
   for (const t of rows) {
-    catTotals[t.category] = (catTotals[t.category] || 0) + toEur(t, rate);
+    catTotalsCny[t.category] = (catTotalsCny[t.category] || 0) + txToCny(t, rates);
+  }
+  const catTotals = {};
+  for (const c of Object.keys(catTotalsCny)) {
+    catTotals[c] = convertAmount(catTotalsCny[c], "CNY", dispCur, rates);
   }
   const cats  = Object.keys(catTotals).sort((a, b) => catTotals[b] - catTotals[a]);
   const total = cats.reduce((a, c) => a + catTotals[c], 0);
@@ -90,18 +99,18 @@ export function render() {
   if (!cats.length) {
     html += `<div style="text-align:center;padding:30px;color:var(--t3);font-size:12px">${emptyMsg}</div>`;
   } else {
-    html += renderPie(typeLabel, total, cats, catTotals);
+    html += renderPie(typeLabel, total, cats, catTotals, dispSym);
     html += `<div class="s-title">类别排行</div>`;
-    html += renderRanking(cats, catTotals, total, customByType);
+    html += renderRanking(cats, catTotals, total, customByType, dispSym);
     if (!isIncome) {
-      const bHtml = renderBudgets(catTotals, budgets, customByType);
+      const bHtml = renderBudgets(catTotals, budgets, customByType, dispSym);
       if (bHtml) html += `<div class="s-title">预算进度</div>${bHtml}`;
     }
   }
 
   // 储蓄目标进度（独立于支出/收入 tab，始终显示）
   if (goals.length) {
-    html += renderGoals(goals, txs, rate);
+    html += renderGoals(goals, txs, rates, dispCur, dispSym);
   }
 
   body.innerHTML = html;
@@ -120,7 +129,7 @@ function renderTabs() {
 
 // ── 饼图 + 图例 ──────────────────────────────────────────────────────────────
 
-function renderPie(typeLabel, total, cats, catTotals) {
+function renderPie(typeLabel, total, cats, catTotals, dispSym) {
   let offset = 0;
   let paths = "";
   for (const c of cats) {
@@ -145,7 +154,7 @@ function renderPie(typeLabel, total, cats, catTotals) {
            `<svg viewBox="0 0 100 100" width="110" height="110" style="flex-shrink:0">` +
              `<g transform="rotate(-90 50 50)">${paths}</g>` +
              `<text x="50" y="50" text-anchor="middle" dominant-baseline="middle" font-size="9" fill="var(--t2)">${typeLabel}</text>` +
-             `<text x="50" y="62" text-anchor="middle" font-size="8" fill="var(--t3)">€${total.toFixed(2)}</text>` +
+             `<text x="50" y="62" text-anchor="middle" font-size="8" fill="var(--t3)">${dispSym}${total.toFixed(2)}</text>` +
            `</svg>` +
            `<div class="chart-leg">${legend}</div>` +
          `</div>`;
@@ -153,7 +162,7 @@ function renderPie(typeLabel, total, cats, catTotals) {
 
 // ── 排行榜 ───────────────────────────────────────────────────────────────────
 
-function renderRanking(cats, catTotals, total, customByType) {
+function renderRanking(cats, catTotals, total, customByType, dispSym) {
   return cats.map((c, i) => {
     const v = catTotals[c];
     const pct = Math.round(v / total * 100);
@@ -168,7 +177,7 @@ function renderRanking(cats, catTotals, total, customByType) {
                  `<div class="rank-bar" style="width:${pct}%;background:${color}"></div>` +
                `</div>` +
              `</div>` +
-             `<div class="rank-amt">${v.toFixed(2)} €</div>` +
+             `<div class="rank-amt">${v.toFixed(2)} ${dispSym}</div>` +
            `</div>`;
   }).join("");
 }
@@ -177,7 +186,7 @@ function renderRanking(cats, catTotals, total, customByType) {
 
 const BUDGET_DEFAULT_CATS = ["餐饮", "超市", "购物", "交通", "娱乐", "生活"];
 
-function renderBudgets(catTotals, budgets, customByType) {
+function renderBudgets(catTotals, budgets, customByType, dispSym) {
   let html = "";
   for (const c of BUDGET_DEFAULT_CATS) {
     if (!budgets[c]) continue;
@@ -189,7 +198,7 @@ function renderBudgets(catTotals, budgets, customByType) {
     html += `<div class="budget-card">` +
               `<div class="budget-head">` +
                 `<div class="budget-cat">${ico} ${c}</div>` +
-                `<div class="budget-nums">${spent.toFixed(2)} / ${bgt} €</div>` +
+                `<div class="budget-nums">${spent.toFixed(2)} / ${bgt} ${dispSym}</div>` +
               `</div>` +
               `<div class="budget-track">` +
                 `<div class="budget-fill ${cls}" style="width:${pct}%"></div>` +
@@ -201,19 +210,20 @@ function renderBudgets(catTotals, budgets, customByType) {
 
 // ── 储蓄目标进度 ────────────────────────────────────────────────────────────
 
-function renderGoals(goals, txs, rate) {
-  const totalSav = totalSavingsInEur(txs, rate);
+function renderGoals(goals, txs, rates, dispCur, dispSym) {
+  const totalSavCny = sumByTypeInCny(txs, "savings", rates);
+  const totalSav    = convertAmount(totalSavCny, "CNY", dispCur, rates);
   let html = `<div class="s-title">储蓄目标</div>`;
   for (const g of goals) {
     const pct = Math.min(Math.round(totalSav / g.target * 100), 100);
     const remaining = Math.max(g.target - totalSav, 0);
-    const remainTxt = pct >= 100 ? "🎉 目标达成！" : `还差 €${remaining.toFixed(2)}`;
+    const remainTxt = pct >= 100 ? "🎉 目标达成！" : `还差 ${dispSym}${remaining.toFixed(2)}`;
     html += `<div class="goal-card">` +
               `<div class="goal-head">` +
                 `<div class="goal-name">🏦 ${g.name}</div>` +
                 `<div class="goal-pct">${pct}%</div>` +
               `</div>` +
-              `<div class="goal-amounts">已累计 €${totalSav.toFixed(2)} / 目标 €${g.target}</div>` +
+              `<div class="goal-amounts">已累计 ${dispSym}${totalSav.toFixed(2)} / 目标 ${dispSym}${g.target}</div>` +
               `<div class="goal-track">` +
                 `<div class="goal-fill" style="width:${pct}%"></div>` +
               `</div>` +

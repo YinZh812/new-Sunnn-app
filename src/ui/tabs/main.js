@@ -46,6 +46,11 @@ const CHEVRON_ICON =
 export function init(deps = {}) {
   _toast = deps.toast || ((msg) => console.log("[toast]", msg));
 
+  // settings 变化时（默认货币 / 汇率改动等）重新渲染列表的分组汇总
+  store.on("settings:changed", () => {
+    if (byId("list")) renderList();
+  });
+
   // 列表边缘换月手势（DOM id 与 inline 一致：#list）
   // 注意：inline 的 initListEdgeScroll 也会绑同一个容器，靠 dataset.edgeBound 防重。
   // 谁先绑谁就生效；inline 在同步执行末尾的 render() 里已经绑过 → 这里不会重复。
@@ -222,30 +227,31 @@ export function renderList(moOverride) {
 
   const settings = store.getSettings();
   const rates    = settings.ratesToCny || {};
-  const dispCur  = settings.displayCurrency || "EUR";
-  const dispSym  = currencySymbol(dispCur);
+  // 当日收支总和：跟随"默认货币"（设置页里选的）而不是 Hero 临时切换的 displayCurrency
+  const sumCur   = settings.defaultCurrency || "EUR";
+  const sumSym   = currencySymbol(sumCur);
   const customByType = store.getCustomCategoriesByType();
 
   for (const k of order) {
     const g = groups[k];
 
-    // 分组头：日期 + 当日收支汇总（按当前显示币种 dispCur）
-    // 先 CNY 聚合，再统一换算到 dispCur，避免单笔多次转换的精度损失
+    // 分组头：日期 + 当日收支汇总（按 settings.defaultCurrency）
+    // 先 CNY 聚合，再统一换算到 sumCur，避免单笔多次转换的精度损失
     let inCny = 0, exCny = 0;
     for (const t of g.items) {
       const vCny = (t.amount || 0) * (rates[t.currency || "CNY"] || 1);
       if (t.type === "income")        inCny += vCny;
       else if (t.type === "expense")  exCny += vCny;
     }
-    const inSum = convertAmount(inCny, "CNY", dispCur, rates);
-    const exSum = convertAmount(exCny, "CNY", dispCur, rates);
+    const inSum = convertAmount(inCny, "CNY", sumCur, rates);
+    const exSum = convertAmount(exCny, "CNY", sumCur, rates);
     let sumHtml = "";
     if (inSum > 0 && exSum > 0) {
-      sumHtml = `<span class="sec-sum">收 +${inSum.toFixed(2)}${dispSym}  支 −${exSum.toFixed(2)}${dispSym}</span>`;
+      sumHtml = `<span class="sec-sum">收 +${inSum.toFixed(2)}${sumSym}  支 −${exSum.toFixed(2)}${sumSym}</span>`;
     } else if (inSum > 0) {
-      sumHtml = `<span class="sec-sum">收 +${inSum.toFixed(2)}${dispSym}</span>`;
+      sumHtml = `<span class="sec-sum">收 +${inSum.toFixed(2)}${sumSym}</span>`;
     } else if (exSum > 0) {
-      sumHtml = `<span class="sec-sum">支 −${exSum.toFixed(2)}${dispSym}</span>`;
+      sumHtml = `<span class="sec-sum">支 −${exSum.toFixed(2)}${sumSym}</span>`;
     }
 
     const sec = document.createElement("div");
