@@ -221,26 +221,31 @@ export function renderList(moOverride) {
   }
 
   const settings = store.getSettings();
-  const rate     = safeRate(settings.eurToCny);
+  const rates    = settings.ratesToCny || {};
+  const dispCur  = settings.displayCurrency || "EUR";
+  const dispSym  = currencySymbol(dispCur);
   const customByType = store.getCustomCategoriesByType();
 
   for (const k of order) {
     const g = groups[k];
 
-    // 分组头：日期 + 当日收支汇总（始终欧元）
-    let inSum = 0, exSum = 0;
+    // 分组头：日期 + 当日收支汇总（按当前显示币种 dispCur）
+    // 先 CNY 聚合，再统一换算到 dispCur，避免单笔多次转换的精度损失
+    let inCny = 0, exCny = 0;
     for (const t of g.items) {
-      const vEur = toEur(t, rate);
-      if (t.type === "income")        inSum += vEur;
-      else if (t.type === "expense")  exSum += vEur;
+      const vCny = (t.amount || 0) * (rates[t.currency || "CNY"] || 1);
+      if (t.type === "income")        inCny += vCny;
+      else if (t.type === "expense")  exCny += vCny;
     }
+    const inSum = convertAmount(inCny, "CNY", dispCur, rates);
+    const exSum = convertAmount(exCny, "CNY", dispCur, rates);
     let sumHtml = "";
     if (inSum > 0 && exSum > 0) {
-      sumHtml = `<span class="sec-sum">收 +${inSum.toFixed(2)}€  支 −${exSum.toFixed(2)}€</span>`;
+      sumHtml = `<span class="sec-sum">收 +${inSum.toFixed(2)}${dispSym}  支 −${exSum.toFixed(2)}${dispSym}</span>`;
     } else if (inSum > 0) {
-      sumHtml = `<span class="sec-sum">收 +${inSum.toFixed(2)}€</span>`;
+      sumHtml = `<span class="sec-sum">收 +${inSum.toFixed(2)}${dispSym}</span>`;
     } else if (exSum > 0) {
-      sumHtml = `<span class="sec-sum">支 −${exSum.toFixed(2)}€</span>`;
+      sumHtml = `<span class="sec-sum">支 −${exSum.toFixed(2)}${dispSym}</span>`;
     }
 
     const sec = document.createElement("div");
