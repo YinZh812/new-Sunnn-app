@@ -515,12 +515,13 @@ body{font-family:var(--font-app);color:var(--t1);-webkit-font-smoothing:antialia
 .manual-cur-toggle{position:absolute;left:10px;top:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:var(--card-alt);border:1px solid var(--bdr);border-radius:50%;color:var(--t1);font-size:15px;font-weight:600;cursor:pointer;user-select:none;line-height:1;font-family:var(--font-digit);padding:0}
 .manual-cur-toggle:active{opacity:.6}
 
-/* 设置页 货币与汇率卡：每个币种独占一行的开关行 */
-.cur-row{display:flex;align-items:center;padding:10px 16px;gap:10px;cursor:pointer;border-top:1px solid var(--bdr);user-select:none;background:var(--card)}
-.cur-row:first-of-type{border-top:1px solid var(--bdr)}
-.cur-row:active{background:var(--card-alt)}
-.cur-row .cur-rate-inp{background:var(--card-alt);border:1px solid var(--bdr);border-radius:6px;color:var(--t1);font-family:var(--font-digit);outline:none}
-.cur-row .cur-rate-inp:focus{border-color:var(--acc)}
+/* 设置页 货币与汇率卡：每个币种独占一行的开关行
+ * 用 .set-row 同样的 padding/border-bottom 节奏，保持卡内视觉一致。 */
+.cur-row{gap:8px;user-select:none}
+.cur-rate-inp{background:var(--card);border:1px solid var(--bdr);border-radius:6px;color:var(--t1);font-family:var(--font-digit);outline:none}
+.cur-rate-inp:focus{border-color:var(--acc)}
+.cur-row-x{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--bdr2);color:var(--t2);cursor:pointer;font-size:14px;line-height:1;margin-left:4px;user-select:none}
+.cur-row-x:active{opacity:.7}
 
 .manual-combo{background:var(--card-alt);overflow:hidden;border:0;margin:8px -16px 0;border-radius:0;padding-bottom:env(safe-area-inset-bottom)}
 .manual-combo:focus-within{border-color:var(--acc)}

@@ -16,9 +16,16 @@ import { openOverlay, closeOverlay, attachSheetSwipe } from "../components/overl
 import { fxTap } from "../components/sfx.js";
 import { store } from "../../state/store.js";
 import { getCategoryIcon, DEFAULT_CATS_BY_TYPE } from "../../domain/categories.js";
+import { SUPPORTED_CURRENCIES } from "../../domain/currency.js";
 import { renderIcon } from "../../utils/icons.js";
 import { formatTransactionFull } from "../../domain/dates.js";
-import { pad2, escapeHtml, formatAmount } from "../../utils/format.js";
+import { pad2, escapeHtml, formatAmount, currencySymbol } from "../../utils/format.js";
+
+// 货币 code → "中文名 符号"（如 "美元 $"）
+function curDisplay(code) {
+  const ccy = SUPPORTED_CURRENCIES.find((c) => c.code === code);
+  return ccy ? ccy.label + " " + ccy.symbol : (code || "");
+}
 
 const OVERLAY_ID = "ov-confirm";
 const SHEET_ID   = "sh-confirm";
@@ -33,7 +40,7 @@ function amtColor(t) {
   return t.type === "income" || t.type === "net_income" ? "#1A7A40"
        : t.type === "savings" ? "#2255AA" : "#CC2222";
 }
-function sym(t) { return t.currency === "CNY" ? "¥" : "€"; }
+function sym(t) { return currencySymbol(t.currency); }
 function sign(t) { return t.type === "expense" ? "−" : "+"; }
 
 function getCatsByType(type) {
@@ -166,7 +173,7 @@ function renderConfirmSingle() {
       '</div>' +
       '<div class="srow srow-edit" onclick="confEditCur()">' +
         '<span class="sk">货币</span>' +
-        '<span class="sv2" id="conf-cur-disp">' + (t.currency === "CNY" ? "人民币 ¥" : "欧元 €") + '</span>' +
+        '<span class="sv2" id="conf-cur-disp">' + escapeHtml(curDisplay(t.currency)) + '</span>' +
       '</div>' +
       '<div class="srow">' +
         '<span class="sk">时间</span>' +
@@ -290,9 +297,16 @@ export function editType() {
 export function editCurrency() {
   const t = _pending[0];
   if (!t) return;
-  t.currency = t.currency === "CNY" ? "EUR" : "CNY";
+  // 在 settings.enabledCurrencies 之间循环（与 Hero / 手动 / 详情页一致）
+  const settings = store.getSettings();
+  const enabled = Array.isArray(settings.enabledCurrencies) && settings.enabledCurrencies.length
+    ? settings.enabledCurrencies
+    : ["EUR", "CNY"];
+  let i = enabled.indexOf(t.currency);
+  if (i < 0) i = -1;
+  t.currency = enabled[(i + 1) % enabled.length];
   const d = byId("conf-cur-disp");
-  if (d) d.textContent = t.currency === "CNY" ? "人民币 ¥" : "欧元 €";
+  if (d) d.textContent = curDisplay(t.currency);
 }
 
 // ── 补录金额弹窗 ────────────────────────────────────────────────────────────
@@ -301,7 +315,7 @@ export function showAmtPrompt(result) {
   const slbl = byId("slbl");
   if (slbl) slbl.textContent = "补充金额";
 
-  const sy = result.currency === "CNY" ? "¥" : "€";
+  const sy = currencySymbol(result.currency);
   const body = byId("sbody");
   if (body) {
     body.innerHTML =
