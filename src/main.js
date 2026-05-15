@@ -340,6 +340,9 @@ window.openLucidePicker   = settingsTab.openLucidePicker;
 window.closeLucidePicker  = settingsTab.closeLucidePicker;
 window.deleteCat          = settingsTab.deleteCat;
 window.addNewCat          = settingsTab.addNewCat;
+// v2 阶段 6.3：个人词典 onclick 桥接
+window.removeLearnedRule  = settingsTab.handleRemoveLearnedRule;
+window.clearLearnedRules  = settingsTab.handleClearLearnedRules;
 
 // ── 桥接输入流（doSend / openInputSheet / chooseCurrency / clearInputField）──
 //

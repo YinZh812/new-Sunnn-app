@@ -4,7 +4,7 @@
 // 主题切换实时应用 CSS 变量。
 
 import { byId } from "../../utils/dom.js";
-import { pad2 } from "../../utils/format.js";
+import { pad2, escapeHtml } from "../../utils/format.js";
 import { store } from "../../state/store.js";
 import { safeRate, sumByTypeInEur } from "../../domain/currency.js";
 import { LEGACY_CAT_LUCIDE } from "../../domain/categories.js";
@@ -144,6 +144,10 @@ export function init({ toast } = {}) {
   if (toast) _toast = toast;
   store.on("settings:changed", () => {
     applyTheme();
+    if (isVisible()) render();
+  });
+  // v2 阶段 6.3：学习规则变化时重渲染设置页（删除/清空/新学习时即时反映）
+  store.on("learnedRules:changed", () => {
     if (isVisible()) render();
   });
 }
@@ -300,7 +304,10 @@ export function render() {
         '</label>' +
         '<div class="action-btn" style="flex:1;background:var(--bdr2);color:var(--t1)" onclick="confirmImport()" id="importConfirmBtn">导入并合并</div>' +
       '</div>' +
-    '</div>';
+    '</div>' +
+
+    // ── 我的个人词典卡（v2 阶段 6.3）──
+    renderLearnedRulesCard();
 
   // 绑定隐藏的色相滑块
   bindHueSlider("hueSlider", "hueThumb",
@@ -1196,6 +1203,91 @@ export function addNewCat() {
   renderCatSettings();
   const list = document.getElementById("catSettingsList");
   setTimeout(function () { list.scrollTop = list.scrollHeight; }, 30);
+}
+
+// ── 我的个人词典（v2 阶段 6.3 学习规则管理）──────────────────────────────────
+//
+// 渲染 "我的个人词典" 卡片。在 render() 的 body.innerHTML 末尾调用。
+// 学习规则保存在 store.getLearnedRules()，结构 { phrase, type, category, hits, lastUsed }。
+
+const TYPE_LABEL_CN = { expense: "支出", income: "收入", savings: "储蓄" };
+
+function renderLearnedRulesCard() {
+  const rules = store.getLearnedRules();
+  const count = rules.length;
+
+  // 标题（含计数与清空按钮）
+  const titleHtml =
+    '<div class="set-title" style="display:flex;justify-content:space-between;align-items:center">' +
+      '<span>我的个人词典 <span style="color:var(--t3);font-weight:400;font-size:11px">· 已学 ' + count + ' 条</span></span>' +
+      (count
+        ? '<span class="theme-adv-btn" style="cursor:pointer" onclick="clearLearnedRules()">清空</span>'
+        : "") +
+    '</div>';
+
+  if (count === 0) {
+    return (
+      '<div class="set-card">' +
+        titleHtml +
+        '<div style="padding:10px 16px;font-size:11px;color:var(--t3);line-height:1.7">' +
+          '还没有学习任何个人规则。<br>在确认弹窗里修改类别后，系统会自动学到 "这句话以后归这一类"。下次说类似的就自动归类。' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  // 按 lastUsed 倒序，最近学的在最上面
+  const sorted = rules.slice().sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0));
+
+  const rowsHtml = sorted.map((r) => {
+    const phEnc = encodeURIComponent(r.phrase);
+    const typeLbl = TYPE_LABEL_CN[r.type] || r.type;
+    return (
+      '<div class="set-row" style="font-size:12px;padding:8px 16px">' +
+        '<div style="flex:1;min-width:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+          '<span style="color:var(--t1);font-weight:500">' + escapeHtml(r.phrase) + '</span>' +
+          '<span style="color:var(--t3)">→</span>' +
+          '<span style="color:var(--t1)">' + escapeHtml(r.category) + '</span>' +
+          '<span style="color:var(--t3);font-size:10px">· ' + typeLbl + '</span>' +
+        '</div>' +
+        '<span style="cursor:pointer;color:var(--t3);font-size:18px;line-height:1;padding:4px 8px" ' +
+          'onclick="removeLearnedRule(\'' + phEnc + '\',\'' + r.type + '\')">×</span>' +
+      '</div>'
+    );
+  }).join("");
+
+  return (
+    '<div class="set-card">' +
+      titleHtml +
+      rowsHtml +
+    '</div>'
+  );
+}
+
+/**
+ * onclick handler：删除单条学习规则。
+ * @param {string} phraseEncoded 经 encodeURIComponent 编码的 phrase（避免 onclick 字符串注入）
+ * @param {string} type expense / income / savings
+ */
+export function handleRemoveLearnedRule(phraseEncoded, type) {
+  fxDelete();
+  try {
+    const phrase = decodeURIComponent(phraseEncoded);
+    store.removeLearnedRule(phrase, type);
+    _toast("已删除");
+  } catch (err) {
+    console.warn("[settings] removeLearnedRule failed:", err);
+  }
+}
+
+/** onclick handler：清空所有学习规则（带原生 confirm 二次确认）。 */
+export function handleClearLearnedRules() {
+  const count = store.getLearnedRules().length;
+  if (!count) return;
+  fxTap();
+  if (!confirm("确认清空全部 " + count + " 条学习规则？此操作不可撤销。")) return;
+  store.clearLearnedRules();
+  _toast("已清空");
 }
 
 // ── 导出给外部使用的颜色帮手 ────────────────────────────────────────────────
