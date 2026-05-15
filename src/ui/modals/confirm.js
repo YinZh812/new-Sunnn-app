@@ -69,6 +69,12 @@ export function open(results) {
   } else {
     _pending = Array.isArray(results) ? results : [];
   }
+  // v2 阶段 6.2：快照原始 parser 给的 category，用于 doConfirm 时比较是否触发学习
+  for (const t of _pending) {
+    if (t && t.category != null && t._origCategory === undefined) {
+      t._origCategory = t.category;
+    }
+  }
   showConfirm();
 }
 
@@ -353,6 +359,19 @@ export function showErr(msg) {
 
 export function doConfirm() {
   if (!_pending.length) return;
+
+  // v2 阶段 6.2：用户在弹窗里改了类别就学一下（phrase = desc）。
+  // 学习触发条件：原 parser 给的 _origCategory 与最终 category 不同 → 学到 (desc, type, 新 category)。
+  // 短 desc / 兜底 "消费" 由 learning.recordLearning 内部拒收，这里不做前置过滤。
+  for (const t of _pending) {
+    if (t && t._origCategory && t.category && t._origCategory !== t.category) {
+      try {
+        store.addLearnedRule(t.desc, t.type, t.category);
+      } catch (err) {
+        console.warn("[confirm] addLearnedRule failed:", err);
+      }
+    }
+  }
 
   const toSave = _pending.map((t) => ({
     amount:        t.amount,

@@ -27,6 +27,7 @@ import {
   TIME_PERIOD,
 } from "./dictionary.v2.js";
 import { preprocess } from "./preprocess.js";
+import { applyLearnedRules } from "../learning.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 类别识别
@@ -476,11 +477,15 @@ export function voiceRemapCategoryByType(text, type) {
 
 /**
  * @param {string} text
- * @param {{defaultCurrency:"EUR"|"CNY", allowedCategoriesByType?:Object}} options
+ * @param {{
+ *   defaultCurrency: "EUR"|"CNY",
+ *   allowedCategoriesByType?: Object,
+ *   learnedRules?: Array
+ * }} options
  * @returns {Array}
  */
 export function parseVoiceText(text, options) {
-  const { defaultCurrency, allowedCategoriesByType } = options || {};
+  const { defaultCurrency, allowedCategoriesByType, learnedRules } = options || {};
   if (!defaultCurrency) {
     throw new Error("parseVoiceText: options.defaultCurrency is required");
   }
@@ -503,6 +508,13 @@ export function parseVoiceText(text, options) {
     const needAmt = !amtInfo || amtInfo.amount === null || amtInfo.amount <= 0;
 
     let mappedCat = voiceRemapCategoryByType(seg, type);
+
+    // v2 阶段 6.2：个人学习规则优先级最高（子串包含 + 最长匹配）
+    // 优先级：学习规则 > parser 词典推断 > 兜底"其他"
+    if (Array.isArray(learnedRules) && learnedRules.length) {
+      const learnedCat = applyLearnedRules(seg, type, learnedRules);
+      if (learnedCat) mappedCat = learnedCat;
+    }
 
     if (allowedCategoriesByType && allowedCategoriesByType[type]) {
       const allowed = allowedCategoriesByType[type].map((c) => c.name);

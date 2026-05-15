@@ -75,6 +75,7 @@ export function doSend() {
   const results = parseVoiceText(text, {
     defaultCurrency: settings.defaultCurrency || "EUR",
     allowedCategoriesByType: DEFAULT_CATS_BY_TYPE,
+    learnedRules: store.getLearnedRules(),  // v2 阶段 6.2：把个人学习规则喂给 parser
   });
 
   if (!results || !results.length) return;
