@@ -308,8 +308,12 @@ window.applyTheme = settingsTab.applyTheme;
 window.renderSettings  = settingsTab.render;
 window.setTheme        = settingsTab.setTheme;
 window.setAccent       = settingsTab.setAccent;
-window.setDefCur       = settingsTab.setDefCur;
+window.setDefCur       = settingsTab.setDefCur;             // 旧 seg-btn 入口（已无 HTML 调用，保留兼容）
 window.setRate         = settingsTab.setRate;
+// v2 多币种 dropdown / 启用切换 / 多汇率
+window.setDefCurFromSelect    = settingsTab.setDefCurFromSelect;
+window.toggleEnabledCurrency  = settingsTab.toggleEnabledCurrency;
+window.setRateForCurrency     = settingsTab.setRateForCurrency;
 window.setSfxEnabled   = settingsTab.handleSetSfxEnabled;
 window.setSfxVolume    = settingsTab.handleSetSfxVolume;
 window.setVibEnabled   = settingsTab.handleSetVibEnabled;

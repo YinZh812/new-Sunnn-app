@@ -8,6 +8,7 @@ import { pad2, escapeHtml } from "../../utils/format.js";
 import { store } from "../../state/store.js";
 import { safeRate, sumByTypeInEur } from "../../domain/currency.js";
 import { LEGACY_CAT_LUCIDE } from "../../domain/categories.js";
+import { SUPPORTED_CURRENCIES } from "../../domain/currency.js";
 import { getViewYear, getViewMonth } from "./main.js";
 import {
   setSfxEnabled as _sfxSetEnabled,
@@ -208,21 +209,8 @@ export function render() {
       '<div class="theme-grid">' + themeSwatches + '</div>' +
     '</div>' +
 
-    // ── 货币与汇率卡 ──
-    '<div class="set-card">' +
-      '<div class="set-title">货币与汇率</div>' +
-      '<div class="set-row">' +
-        '<div class="set-label">默认货币</div>' +
-        '<div class="seg-btns">' +
-          '<div class="seg-btn' + (s.defaultCurrency === "EUR" ? " sel" : "") + '" data-v="EUR" onclick="setDefCur(this)">欧元</div>' +
-          '<div class="seg-btn' + (s.defaultCurrency === "CNY" ? " sel" : "") + '" data-v="CNY" onclick="setDefCur(this)">人民币</div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="set-row">' +
-        '<div class="set-label">€ 兑 ¥ 汇率</div>' +
-        '<input type="number" class="set-input" value="' + s.eurToCny + '" step="0.01" oninput="setRate(this)">' +
-      '</div>' +
-    '</div>' +
+    // ── 货币与汇率卡（v2 多币种） ──
+    renderCurrencyCard(s) +
 
     // ── 强调色卡（隐藏） ──
     '<div class="set-card" style="display:none">' +
@@ -1203,6 +1191,124 @@ export function addNewCat() {
   renderCatSettings();
   const list = document.getElementById("catSettingsList");
   setTimeout(function () { list.scrollTop = list.scrollHeight; }, 30);
+}
+
+// ── 货币与汇率卡（v2 多币种）─────────────────────────────────────────────────
+//
+// 三部分：
+//   1) 默认货币：下拉，仅列出 enabled 的币种（保证选了之后能用）
+//   2) 启用货币：5 个 pill 切换；至少保留 1 个；CNY 永远勾上（base）
+//   3) 汇率：对每个 enabled 且非 CNY 的币种显示 "1 X = N CNY" 输入框
+
+function renderCurrencyCard(s) {
+  const enabled = Array.isArray(s.enabledCurrencies) && s.enabledCurrencies.length
+    ? s.enabledCurrencies
+    : ["EUR", "CNY"];
+  const rates = s.ratesToCny || {};
+  const defCur = s.defaultCurrency || enabled[0];
+
+  // 默认货币 dropdown：列出已启用币种
+  const dropOpts = enabled.map((code) => {
+    const ccy = SUPPORTED_CURRENCIES.find((c) => c.code === code);
+    if (!ccy) return "";
+    return '<option value="' + code + '"' + (code === defCur ? " selected" : "") + '>' +
+             escapeHtml(ccy.label) + ' ' + ccy.symbol + ' (' + code + ')' +
+           '</option>';
+  }).join("");
+
+  // 启用货币 pill 列表
+  const enablePills = SUPPORTED_CURRENCIES.map((ccy) => {
+    const isEnabled = enabled.includes(ccy.code);
+    const isCny = ccy.code === "CNY";
+    const cls = "seg-btn" + (isEnabled ? " sel" : "") + (isCny ? " seg-btn-locked" : "");
+    const click = isCny ? "" : ' onclick="toggleEnabledCurrency(\'' + ccy.code + '\')"';
+    return '<div class="' + cls + '" data-v="' + ccy.code + '"' + click + '>' +
+             ccy.symbol + ' ' + escapeHtml(ccy.label) +
+           '</div>';
+  }).join("");
+
+  // 汇率输入：仅 enabled 中非 CNY 的
+  const rateRows = enabled.filter((c) => c !== "CNY").map((code) => {
+    const ccy = SUPPORTED_CURRENCIES.find((c) => c.code === code);
+    if (!ccy) return "";
+    const val = rates[code] != null ? rates[code] : "";
+    return (
+      '<div class="set-row">' +
+        '<div class="set-label">1 ' + ccy.symbol + ' ' + escapeHtml(ccy.label) + ' =</div>' +
+        '<input type="number" class="set-input" style="max-width:110px" step="0.01" min="0" ' +
+               'value="' + val + '" ' +
+               'oninput="setRateForCurrency(\'' + code + '\',this.value)">' +
+        '<span style="color:var(--t3);margin-left:6px">¥ CNY</span>' +
+      '</div>'
+    );
+  }).join("");
+
+  return (
+    '<div class="set-card">' +
+      '<div class="set-title">货币与汇率</div>' +
+      // 1. 默认货币 dropdown
+      '<div class="set-row">' +
+        '<div class="set-label">默认货币</div>' +
+        '<select class="set-input" style="max-width:160px" onchange="setDefCurFromSelect(this)">' +
+          dropOpts +
+        '</select>' +
+      '</div>' +
+      // 2. 启用货币
+      '<div class="set-row" style="display:block;padding-top:4px">' +
+        '<div class="set-label" style="margin-bottom:8px">启用货币 ' +
+          '<span style="color:var(--t3);font-size:10px;font-weight:400">（人民币为基准，必选）</span>' +
+        '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px">' + enablePills + '</div>' +
+      '</div>' +
+      // 3. 汇率
+      (rateRows ? '<div style="height:1px;background:var(--bdr);margin:6px 0 4px"></div>' + rateRows : "") +
+    '</div>'
+  );
+}
+
+/** onchange handler：默认货币下拉切换。 */
+export function setDefCurFromSelect(el) {
+  if (!el) return;
+  fxTap();
+  const code = el.value;
+  store.setSettings({ defaultCurrency: code });
+}
+
+/** onclick handler：启用/禁用某币种。CNY 永远启用。 */
+export function toggleEnabledCurrency(code) {
+  if (code === "CNY") return; // 防御性兜底（HTML 已不挂 onclick）
+  const s = store.getSettings();
+  const enabled = Array.isArray(s.enabledCurrencies) ? s.enabledCurrencies.slice() : ["EUR", "CNY"];
+  const i = enabled.indexOf(code);
+  if (i >= 0) {
+    // 禁用：至少保留 1 个非 CNY？其实最低保留 CNY 即可
+    if (enabled.length <= 1) {
+      _toast("至少要保留一种货币");
+      return;
+    }
+    enabled.splice(i, 1);
+  } else {
+    enabled.push(code);
+  }
+  // CNY 兜底加回去
+  if (!enabled.includes("CNY")) enabled.push("CNY");
+
+  fxTap();
+  const patch = { enabledCurrencies: enabled };
+  // 若禁用了当前 defaultCurrency / displayCurrency，回落到第一个启用项
+  if (!enabled.includes(s.defaultCurrency)) patch.defaultCurrency = enabled[0];
+  if (!enabled.includes(s.displayCurrency)) patch.displayCurrency = enabled[0];
+  store.setSettings(patch);
+}
+
+/** oninput handler：修改某币种汇率。code != "CNY"。 */
+export function setRateForCurrency(code, value) {
+  if (code === "CNY") return;
+  const n = parseFloat(value);
+  if (!Number.isFinite(n) || n <= 0) return; // 忽略非法值，让用户继续输入
+  const s = store.getSettings();
+  const next = { ...(s.ratesToCny || {}), [code]: n };
+  store.setSettings({ ratesToCny: next });
 }
 
 // ── 我的个人词典（v2 阶段 6.3 学习规则管理）──────────────────────────────────

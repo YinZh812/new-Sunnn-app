@@ -40,7 +40,18 @@ import {
 const DEFAULT_SETTINGS = Object.freeze({
   defaultCurrency: "EUR",   // 一句话/手动记账时的默认币种（落库用）
   displayCurrency: "EUR",   // Hero 顶部数字显示币种（独立于 defaultCurrency，可在 hero 顶部按钮切换）
-  eurToCny: DEFAULT_EUR_TO_CNY,
+  eurToCny: DEFAULT_EUR_TO_CNY,           // 保留兼容：== ratesToCny.EUR
+  // v2 多币种（Task 2）：启用列表 + 各币种"1 单位 = N CNY"汇率。
+  // 没改这两字段的老用户也能正常用——hydrate 时会从 eurToCny 合成 ratesToCny.EUR，
+  // enabledCurrencies 缺省给 ["EUR","CNY"] 保持旧行为。
+  enabledCurrencies: ["EUR", "CNY"],
+  ratesToCny: {
+    CNY: 1,
+    EUR: DEFAULT_EUR_TO_CNY,
+    USD: 7.2,
+    GBP: 9.3,
+    JPY: 0.047,
+  },
   theme: "gray",
   accent: "",
   accentHue: null,
@@ -123,6 +134,22 @@ function hydrate() {
     ? { ...DEFAULT_SETTINGS, ...savedSettings, customColors: { ...(savedSettings.customColors || {}) } }
     : { ...DEFAULT_SETTINGS };
 
+  // v2 多币种迁移：保证 enabledCurrencies / ratesToCny 都存在，并把老的 eurToCny 同步进 ratesToCny.EUR
+  if (!Array.isArray(state.settings.enabledCurrencies) || state.settings.enabledCurrencies.length === 0) {
+    state.settings.enabledCurrencies = ["EUR", "CNY"];
+  }
+  if (!state.settings.ratesToCny || typeof state.settings.ratesToCny !== "object") {
+    state.settings.ratesToCny = { ...DEFAULT_SETTINGS.ratesToCny };
+  }
+  // 老 eurToCny 优先：如果用户在旧 UI 改过汇率，保留它
+  if (Number.isFinite(Number(state.settings.eurToCny)) && Number(state.settings.eurToCny) > 0) {
+    state.settings.ratesToCny.EUR = Number(state.settings.eurToCny);
+  } else {
+    state.settings.eurToCny = state.settings.ratesToCny.EUR;
+  }
+  // CNY 永远 = 1（base）
+  state.settings.ratesToCny.CNY = 1;
+
   const savedName = loadUserName();
   state.userName = savedName || DEFAULT_USER_NAME;
 
@@ -197,6 +224,16 @@ function setTxs(next) {
 
 function setSettings(patch) {
   state.settings = { ...state.settings, ...patch };
+  // 多币种：让 settings.eurToCny 与 ratesToCny.EUR 保持同步（双向写）
+  if (patch && Object.prototype.hasOwnProperty.call(patch, "eurToCny")) {
+    if (!state.settings.ratesToCny) state.settings.ratesToCny = {};
+    state.settings.ratesToCny = { ...state.settings.ratesToCny, EUR: Number(patch.eurToCny) || 0 };
+  }
+  if (patch && patch.ratesToCny && patch.ratesToCny.EUR != null) {
+    state.settings.eurToCny = Number(patch.ratesToCny.EUR) || 0;
+  }
+  // CNY 永远等于 1，强制纠正
+  if (state.settings.ratesToCny) state.settings.ratesToCny.CNY = 1;
   persistSettings(state.settings);
   emit("settings:changed", state.settings);
 }

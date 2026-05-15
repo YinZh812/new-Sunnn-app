@@ -14,7 +14,10 @@
 import { byId, qsa } from "../../utils/dom.js";
 import { store } from "../../state/store.js";
 import { isInMonth, formatGroupHeader, formatTransactionTimeInline } from "../../domain/dates.js";
-import { safeRate, toEur, netInEur, sumByTypeInEur } from "../../domain/currency.js";
+import {
+  safeRate, toEur, netInEur, sumByTypeInEur,
+  netInCny, sumByTypeInCny, convertAmount,
+} from "../../domain/currency.js";
 import { getCategoryIcon } from "../../domain/categories.js";
 import {
   currencySymbol, splitDecimal, pad2, escapeHtml, formatSignedAmount,
@@ -110,13 +113,14 @@ export function render() {
 export function renderHero() {
   const txs      = store.getTxs();
   const settings = store.getSettings();
-  const rate     = safeRate(settings.eurToCny);
+  const rates    = settings.ratesToCny || {};
 
   const mo = txs.filter((t) => isInMonth(t, _viewYear, _viewMonth));
 
-  // 1. 净额（hnet 始终用欧元符号，与原行为一致）
-  const net = mo.reduce((acc, t) => acc + netInEur(t, rate), 0);
-  setText("hnet", `${net >= 0 ? "+" : "−"}${Math.abs(net).toFixed(2)} €`);
+  // 1. 月份净额（以 CNY 为基准聚合，再转到 EUR 显示——hnet 字段历史就是 €）
+  const netCny = mo.reduce((acc, t) => acc + netInCny(t, rates), 0);
+  const netEur = convertAmount(netCny, "CNY", "EUR", rates);
+  setText("hnet", `${netEur >= 0 ? "+" : "−"}${Math.abs(netEur).toFixed(2)} €`);
 
   // 2. 年月文字
   const ymShort = `${_viewYear}年 · ${_viewMonth + 1}月`;
@@ -125,23 +129,21 @@ export function renderHero() {
   setText("navTitle",  ymCaret);
   setText("an-period", ymCaret);
 
-  // 3. 收入/支出/储蓄欧元化（net_income 计入 income）
-  const incEUR = sumByTypeInEur(mo, "income",  rate);
-  const expEUR = sumByTypeInEur(mo, "expense", rate);
-  const savEUR = sumByTypeInEur(mo, "savings", rate);
+  // 3. 收入/支出/储蓄（CNY 聚合 + 转到 dispCur 显示）
+  const incCny = sumByTypeInCny(mo, "income",  rates);
+  const expCny = sumByTypeInCny(mo, "expense", rates);
+  const savCny = sumByTypeInCny(mo, "savings", rates);
 
-  // 4. 显示币种切换（注意：displayCurrency ≠ defaultCurrency）
+  // 4. 显示币种切换（dispCur 可以是 EUR/CNY/USD/GBP/JPY 中已启用的任意一个）
   //
   // ⚠️ 产品行为（非 bug）：
-  //   - hero 顶部 €/¥ 按钮只影响 Hero 总额：欧元 × 汇率 → 显示为人民币
-  //   - 列表里每行交易仍按 tx.currency 原币种显示（€ 行就是 €，¥ 行就是 ¥）
-  //   - 所以 hero 总额 ≠ 列表行金额加和（按设计如此）
-  //   - 如果以后想"切换列表也跟着切"，需要在 renderList 里把每行金额按 displayCurrency 转换
+  //   - hero 顶部按钮只影响 Hero 总额；列表行仍按 tx.currency 原币种显示。
+  //   - 所以 hero 总额 ≠ 列表行金额加和（按设计如此）。
   const dispCur = settings.displayCurrency || "EUR";
   const dispSym = currencySymbol(dispCur);
-  const inc = dispCur === "CNY" ? incEUR * rate : incEUR;
-  const exp = dispCur === "CNY" ? expEUR * rate : expEUR;
-  const sav = dispCur === "CNY" ? savEUR * rate : savEUR;
+  const inc = convertAmount(incCny, "CNY", dispCur, rates);
+  const exp = convertAmount(expCny, "CNY", dispCur, rates);
+  const sav = convertAmount(savCny, "CNY", dispCur, rates);
 
   // 5. 旧字段（display:none 但保留，便于回退）
   setText("sin",   `${inc.toFixed(2)} ${dispSym}`);
@@ -561,11 +563,17 @@ export function closeIamt(save) {
   if (typeof window.render === "function") window.render();
 }
 
-/** Hero 顶部 €/¥ 切换按钮。与原 inline toggleDisplayCurrency 行为完全等价。 */
+/** Hero 顶部货币切换按钮：在 settings.enabledCurrencies 之间循环。 */
 export function toggleDisplayCurrency() {
   if (typeof window.fxTap === "function") window.fxTap();
   const settings = store.getSettings();
-  settings.displayCurrency = settings.displayCurrency === "CNY" ? "EUR" : "CNY";
-  store.setSettings(settings);
+  const enabled = Array.isArray(settings.enabledCurrencies) && settings.enabledCurrencies.length
+    ? settings.enabledCurrencies
+    : ["EUR", "CNY"];
+  const cur = settings.displayCurrency || enabled[0];
+  let i = enabled.indexOf(cur);
+  if (i < 0) i = -1;
+  const next = enabled[(i + 1) % enabled.length];
+  store.setSettings({ displayCurrency: next });
   if (typeof window.render === "function") window.render();
 }

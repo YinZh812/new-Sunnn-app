@@ -5,12 +5,11 @@
 export const pad2 = (n) => String(n).padStart(2, "0");
 
 /**
- * 货币代码到符号：
- *   currencySymbol("EUR") -> "€"
- *   currencySymbol("CNY") -> "¥"
- *   currencySymbol(其他)  -> "€"（默认欧元，与现有逻辑兼容）
+ * 货币代码到符号。多币种 v2：支持 EUR/CNY/USD/GBP/JPY。
+ * 未识别的代码返回 "€"（与历史行为兼容）。
  */
-export const currencySymbol = (currency) => (currency === "CNY" ? "¥" : "€");
+const CUR_SYMBOL_MAP = { EUR: "€", CNY: "¥", USD: "$", GBP: "£", JPY: "¥" };
+export const currencySymbol = (currency) => CUR_SYMBOL_MAP[currency] || "€";
 
 /**
  * 安全的小数格式化。amount 不是数字时返回 "0.00"。
