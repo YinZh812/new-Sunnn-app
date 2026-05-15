@@ -118,7 +118,7 @@ export function open(idx = -1) {
 
   // 类别行 + 类别网格
   syncTypeTabs();
-  syncCurPills();
+  syncCurToggle();
   buildCatGrid();
   buildManualCatRow();
 
@@ -161,23 +161,43 @@ function syncTypeTabs() {
   });
 }
 
-// ── 货币 pill ───────────────────────────────────────────────────────────────
+// ── 货币圆形按钮（与 hero 顶部 .cur-toggle-btn 风格一致） ───────────────────
+//
+// 点一下在已启用的货币之间循环。Task 1 阶段先硬编码 EUR↔CNY；
+// Task 2 会改成读 store.settings.enabledCurrencies。
 
-export function selCurPill(el) {
-  fxTap();
-  qsa("#manualCurRow .manual-cur-pill").forEach((p) => p.classList.remove("active"));
-  el.classList.add("active");
-  mCur = el.getAttribute("data-v");
-  const sym = mCur === "CNY" ? "¥" : "€";
-  const s1 = byId("amtSym");   if (s1) s1.textContent = sym;
-  const s2 = byId("mcAmtSym"); if (s2) s2.textContent = sym;
-  qsa("#curbtns .seg-btn").forEach((b) => b.classList.toggle("sel", b.getAttribute("data-v") === mCur));
+const CUR_CYCLE_FALLBACK = ["EUR", "CNY"];
+const CUR_SYMBOLS = { EUR: "€", CNY: "¥", USD: "$", GBP: "£", JPY: "¥" };
+
+function getCycleList() {
+  // Task 2 hook：以后从 store.settings.enabledCurrencies 读
+  const s = store.getSettings();
+  if (Array.isArray(s.enabledCurrencies) && s.enabledCurrencies.length >= 1) {
+    return s.enabledCurrencies;
+  }
+  return CUR_CYCLE_FALLBACK;
 }
 
-function syncCurPills() {
-  qsa("#manualCurRow .manual-cur-pill").forEach((p) => {
-    p.classList.toggle("active", p.getAttribute("data-v") === mCur);
-  });
+function symFor(code) { return CUR_SYMBOLS[code] || code; }
+
+/** onclick handler：圆形按钮点击 → 循环到下一个已启用货币。 */
+export function selCurToggle() {
+  fxTap();
+  const cycle = getCycleList();
+  let i = cycle.indexOf(mCur);
+  if (i < 0) i = -1;
+  mCur = cycle[(i + 1) % cycle.length];
+  syncCurToggle();
+  // 同步隐藏 seg-btns 与金额符号
+  qsa("#curbtns .seg-btn").forEach((b) => b.classList.toggle("sel", b.getAttribute("data-v") === mCur));
+  const s1 = byId("amtSym");   if (s1) s1.textContent = symFor(mCur);
+  const s2 = byId("mcAmtSym"); if (s2) s2.textContent = symFor(mCur);
+}
+
+/** 同步左上角圆形按钮的显示符号到当前 mCur。 */
+function syncCurToggle() {
+  const btn = byId("manualCurToggleBtn");
+  if (btn) btn.textContent = symFor(mCur);
 }
 
 // ── 类别行 ──────────────────────────────────────────────────────────────────
@@ -474,7 +494,7 @@ export function restoreDraft() {
   mcDate     = manualDraft.mcDate || null;
 
   syncTypeTabs();
-  syncCurPills();
+  syncCurToggle();
   const sym = byId("mcAmtSym");
   if (sym) sym.textContent = mCur === "CNY" ? "¥" : "€";
   buildCatGrid();
@@ -561,7 +581,7 @@ export function selCur(el) {
   mCur = el.getAttribute("data-v");
   const amtSym = byId("amtSym");
   if (amtSym) amtSym.textContent = mCur === "CNY" ? "¥" : "€";
-  syncCurPills();
+  syncCurToggle();
   const s = byId("mcAmtSym");
   if (s) s.textContent = mCur === "CNY" ? "¥" : "€";
 }

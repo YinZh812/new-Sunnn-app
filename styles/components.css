@@ -511,10 +511,9 @@ body{font-family:var(--font-app);color:var(--t1);-webkit-font-smoothing:antialia
 .cat-settings-sheet .cs-add{padding:11px;border:1px dashed var(--bdr);border-radius:10px;text-align:center;color:var(--t2);cursor:pointer;font-size:13px;user-select:none}
 .cat-settings-sheet .cs-add:active{background:var(--bdr2)}
 
-.manual-cur-row{display:flex;gap:6px;margin:10px 0;align-items:center;padding:0 2px}
-.manual-cur-pill{padding:5px 12px;border-radius:14px;font-size:11px;color:var(--t2);background:var(--bg);border:1px solid var(--bdr);cursor:pointer;user-select:none;font-family:inherit}
-.manual-cur-pill.active{background:var(--acc);color:var(--acc-t);border-color:var(--acc)}
-.manual-cur-pill:active{opacity:.7}
+/* 手动记账类型栏左上角的圆形货币切换按钮（与 hero 顶部 .cur-toggle-btn 风格一致） */
+.manual-cur-toggle{position:absolute;left:10px;top:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:var(--card-alt);border:1px solid var(--bdr);border-radius:50%;color:var(--t1);font-size:15px;font-weight:600;cursor:pointer;user-select:none;line-height:1;font-family:var(--font-digit);padding:0}
+.manual-cur-toggle:active{opacity:.6}
 
 .manual-combo{background:var(--card-alt);overflow:hidden;border:0;margin:8px -16px 0;border-radius:0;padding-bottom:env(safe-area-inset-bottom)}
 .manual-combo:focus-within{border-color:var(--acc)}
