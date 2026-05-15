@@ -12,6 +12,7 @@ const KEYS = Object.freeze({
   CAT_BY_TYPE:   "customCategoriesByType",
   CAT_VERSION:   "customCategoriesVersion",
   USER_NAME:     "userName",
+  LEARNED_RULES: "acct_learnedRules",  // v2 阶段 6：个人学习的 phrase → category 规则
   SFX_ENABLED:   "sfxEnabled",
   SFX_VOLUME:    "sfxVolume",
   VIB_ENABLED:   "vibEnabled",
@@ -86,3 +87,6 @@ export const saveCatsVersion   = (v) => writeString(KEYS.CAT_VERSION, v);
 
 export const loadUserName      = ()  => readString(KEYS.USER_NAME, "");
 export const saveUserName      = (v) => writeString(KEYS.USER_NAME, v);
+
+export const loadLearnedRules  = ()  => readJson(KEYS.LEARNED_RULES, []);
+export const saveLearnedRules  = (v) => writeJson(KEYS.LEARNED_RULES, v);

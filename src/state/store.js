@@ -22,6 +22,7 @@ import {
   loadCatsByType, saveCatsByType as persistCatsByType,
   loadCatsVersion, saveCatsVersion as persistCatsVersion,
   loadUserName, saveUserName as persistUserName,
+  loadLearnedRules, saveLearnedRules as persistLearnedRules,
 } from "./storage.js";
 
 import {
@@ -29,6 +30,9 @@ import {
   migrateLegacyTxCategoryNames,
 } from "../domain/categories.js";
 import { DEFAULT_EUR_TO_CNY } from "../domain/currency.js";
+import {
+  recordLearning, forgetLearning, clearLearning,
+} from "../domain/learning.js";
 
 // ── 默认值 ──────────────────────────────────────────────────────────────────
 
@@ -59,6 +63,7 @@ const state = {
     savings: [],
   },
   userName:               DEFAULT_USER_NAME,
+  learnedRules:           [],  // v2 阶段 6：个人学习的 phrase → category 规则
 };
 
 // ── 简易事件总线 ────────────────────────────────────────────────────────────
@@ -121,6 +126,10 @@ function hydrate() {
   const savedName = loadUserName();
   state.userName = savedName || DEFAULT_USER_NAME;
 
+  // 学习规则
+  const loadedRules = loadLearnedRules();
+  state.learnedRules = Array.isArray(loadedRules) ? loadedRules : [];
+
   hydrateCustomCategories();
 
   // 广播一次 —— UI 订阅者借此完成首屏渲染
@@ -131,6 +140,7 @@ function hydrate() {
   emit("deletedSugs:changed", state.deletedSugs);
   emit("cats:changed",        state.customCategoriesByType);
   emit("userName:changed",    state.userName);
+  emit("learnedRules:changed", state.learnedRules);
   emit("hydrated",            null);
 }
 
@@ -175,6 +185,7 @@ const getGoals                  = () => state.goals;
 const getDeletedSugs            = () => state.deletedSugs;
 const getCustomCategoriesByType = () => state.customCategoriesByType;
 const getUserName               = () => state.userName;
+const getLearnedRules           = () => state.learnedRules;
 
 // ── 写入（自动 persist + emit） ─────────────────────────────────────────────
 
@@ -220,6 +231,28 @@ function setUserName(name) {
   emit("userName:changed", state.userName);
 }
 
+/** 直接写入整个 learnedRules 数组（用于 UI 删除单条/批量清空场景）。 */
+function setLearnedRules(next) {
+  state.learnedRules = Array.isArray(next) ? next : [];
+  persistLearnedRules(state.learnedRules);
+  emit("learnedRules:changed", state.learnedRules);
+}
+
+/** 记一条学习（确认弹窗里改类别时触发）。短词或同名同 type 会自动去重 / 覆盖。 */
+function addLearnedRule(phrase, type, category) {
+  setLearnedRules(recordLearning(state.learnedRules, phrase, type, category));
+}
+
+/** 删除一条（phrase + type 复合键）。 */
+function removeLearnedRule(phrase, type) {
+  setLearnedRules(forgetLearning(state.learnedRules, phrase, type));
+}
+
+/** 清空所有学习规则。 */
+function clearLearnedRules() {
+  setLearnedRules(clearLearning());
+}
+
 // ── 导出 ────────────────────────────────────────────────────────────────────
 
 /** 全局唯一 store。其他模块都通过这个对象交互。 */
@@ -238,6 +271,7 @@ export const store = Object.freeze({
   getDeletedSugs,
   getCustomCategoriesByType,
   getUserName,
+  getLearnedRules,
 
   // setters
   setTxs,
@@ -247,6 +281,10 @@ export const store = Object.freeze({
   setDeletedSugs,
   setCustomCategoriesByType,
   setUserName,
+  setLearnedRules,
+  addLearnedRule,
+  removeLearnedRule,
+  clearLearnedRules,
 });
 
 /** 为方便测试/调试导出原始默认值。 */
