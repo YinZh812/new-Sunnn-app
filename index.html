@@ -162,7 +162,7 @@
     <div class="cbtn bok" style="display:none" onclick="submitManual()">记账</div><div class="cbtn bno" style="display:none" onclick="swipeCloseManual()">取消</div>
 </div></div></div>
 
-<div class="overlay" id="ov-catsettings" onclick="if(event.target===this)closeCatSettings()"><div class="sheet-wrap"><div class="sheet cat-settings-sheet" id="sh-catsettings"><div class="hdl" id="hdl-catsettings"></div><div class="slbl">类别管理</div><div class="cs-list" id="catSettingsList"></div><div class="cs-add" onclick="addNewCat()">+ 添加新类别</div><div class="cbtn bok" onclick="closeCatSettings()" style="margin-top:10px">完成</div></div></div></div>
+<div class="overlay" id="ov-catsettings" style="z-index:85" onclick="if(event.target===this)closeCatSettings()"><div class="sheet-wrap"><div class="sheet cat-settings-sheet" id="sh-catsettings"><div class="hdl" id="hdl-catsettings"></div><div class="slbl">类别管理</div><div class="cs-list" id="catSettingsList"></div><div class="cs-add" onclick="addNewCat()">+ 添加新类别</div><div class="cbtn bok" onclick="closeCatSettings()" style="margin-top:10px">完成</div></div></div></div>
 
 <div class="overlay" id="ov-lucide-picker" onclick="if(event.target===this)closeLucidePicker()" style="z-index:85"><div class="sheet-wrap"><div class="sheet" style="max-height:70vh"><div class="hdl"></div><div class="slbl">选择图标</div><div class="lucide-picker-grid" id="lucide-picker-grid"></div><div style="display:flex;gap:8px;margin-top:8px"><div class="cbtn" id="lp-emoji-btn" style="flex:1;background:var(--bdr2);color:var(--t1)">输入 Emoji</div><div class="cbtn bok" style="flex:1" onclick="closeLucidePicker()">取消</div></div></div></div></div>
 

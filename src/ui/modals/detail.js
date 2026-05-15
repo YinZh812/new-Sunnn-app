@@ -100,16 +100,10 @@ export function renderDetailBody() {
         '<span class="sv2" style="display:inline-flex;align-items:center;gap:6px">' +
           '<span class="dt-cat-ico">' + ico + '</span><span id="dt-cat-disp">' + escapeHtml(t.category) + '</span>' +
         '</span></div>' +
-      '<div id="dt-cat-grid-wrap" style="display:none;background:var(--card);padding:10px 12px 44px;position:relative">' +
-        '<div class="conf-cat-wrap" id="dt-cat-grid"></div>' +
-        // 右下角齿轮：打开类别管理（编辑顺序/图标/增删）
-        '<div onclick="event.stopPropagation();openCatSettings()" title="管理类别" ' +
-             'style="position:absolute;right:10px;bottom:8px;width:30px;height:30px;border-radius:50%;background:var(--bdr2);color:var(--t2);display:flex;align-items:center;justify-content:center;cursor:pointer">' +
-          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-            '<circle cx="12" cy="12" r="3"/>' +
-            '<path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>' +
-          '</svg>' +
-        '</div>' +
+      '<div id="dt-cat-grid-wrap" style="display:none;background:var(--card);padding:10px 12px">' +
+        // 齿轮按钮在 detailEditCat() 里作为绝对定位的子节点加进 #dt-cat-grid，
+        // 这样它就坐落在蓝色卡片（.conf-cat-wrap）的右下角，不会与详情下方按钮冲突
+        '<div class="conf-cat-wrap" id="dt-cat-grid" style="position:relative;padding-bottom:42px"></div>' +
       '</div>' +
       '<div class="srow srow-edit" onclick="detailEditType()"><span class="sk">类型</span><span class="sv2" id="dt-type-disp">' + typeL(t.type) + '</span></div>' +
       '<div class="srow srow-edit" onclick="detailEditCur()"><span class="sk">货币</span><span class="sv2" id="dt-cur-disp">' + (t.currency === "CNY" ? "人民币 ¥" : "欧元 €") + '</span></div>' +
@@ -142,6 +136,31 @@ export function detailEditCat() {
     };
     grid.appendChild(btn);
   });
+
+  // 右下齿轮：打开类别管理（cat-settings 的 z-index=85 已能盖住详情面板）
+  const gear = document.createElement("div");
+  gear.title = "管理类别";
+  gear.style.cssText =
+    "position:absolute;right:8px;bottom:8px;width:30px;height:30px;border-radius:50%;" +
+    "background:var(--card);border:1px solid var(--bdr);color:var(--t2);" +
+    "display:flex;align-items:center;justify-content:center;cursor:pointer";
+  gear.innerHTML =
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+    '<circle cx="12" cy="12" r="3"/>' +
+    '<path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 ' +
+    '1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 ' +
+    '2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 ' +
+    '0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 ' +
+    '1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 ' +
+    '1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 ' +
+    '0 0-1.5 1z"/></svg>';
+  gear.onclick = (e) => {
+    e.stopPropagation();
+    if (typeof window.openCatSettings === "function") window.openCatSettings();
+  };
+  grid.appendChild(gear);
+
   wrap.style.display = "block";
 }
 

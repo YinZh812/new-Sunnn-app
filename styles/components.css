@@ -489,10 +489,9 @@ body{font-family:var(--font-app);color:var(--t1);-webkit-font-smoothing:antialia
 .manual-type-cancel{position:absolute;right:10px;top:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--t2);cursor:pointer;user-select:none;border-radius:50%;line-height:1}
 .manual-type-cancel:active{opacity:.5}
 
-.manual-cat-row{display:flex;align-items:flex-start;gap:10px;margin:10px -16px 12px;padding:0 16px;overflow-x:auto;overflow-y:visible;scrollbar-width:none;-ms-overflow-style:none}
-.manual-cat-row::-webkit-scrollbar{display:none}
-.manual-cat-row .manual-cat-item{flex-shrink:0}
-.manual-cat-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;user-select:none;min-width:0}
+/* 手动记账类别行：4 列网格，超过 4 个自动换行（之前是横向滚动，体验差） */
+.manual-cat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px 8px;margin:10px 0 12px;padding:0}
+.manual-cat-item{display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;user-select:none;min-width:0}
 .mci-dot{width:48px;height:48px;border-radius:50%;background:var(--bdr2);display:flex;align-items:center;justify-content:center;color:var(--t2);font-size:20px;transition:background .18s,color .18s}
 .mci-dot svg{width:22px;height:22px;display:block}
 .manual-cat-item.active .mci-dot{background:var(--acc);color:var(--acc-t)}
