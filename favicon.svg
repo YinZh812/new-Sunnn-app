@@ -1,8 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- 账本主体：铺满整个画布，避免 iOS 加黑边。iOS 会自动圆角 -->
+  <!-- 账本主体 -->
   <rect x="0" y="0" width="64" height="64" fill="#A8DCC6"/>
-  <!-- 装订线（左侧深色竖条）-->
+  <!-- 左侧装订线 -->
   <rect x="6" y="0" width="3" height="64" fill="#7BB89A"/>
-  <!-- 美元符号 $（黄色，居中偏右）-->
-  <text x="36" y="46" font-family="Georgia, 'Times New Roman', serif" font-size="40" font-weight="700" fill="#F4C430" text-anchor="middle">$</text>
+  <!-- 右侧书页堆叠（3 层由远到近的纵线，模拟合上的书页边缘）-->
+  <rect x="56" y="0" width="1.5" height="64" fill="#7BB89A" opacity="0.3"/>
+  <rect x="59" y="0" width="1.5" height="64" fill="#7BB89A" opacity="0.55"/>
+  <rect x="62" y="0" width="2" height="64" fill="#7BB89A"/>
+  <!-- 美元符号 $（左移到 30）-->
+  <text x="30" y="46" font-family="Georgia, 'Times New Roman', serif" font-size="40" font-weight="700" fill="#F4C430" text-anchor="middle">$</text>
 </svg>
