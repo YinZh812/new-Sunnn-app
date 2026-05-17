@@ -4,14 +4,15 @@
 
 ---
 
-## 一句话现状（2026-05）
+## 一句话现状（2026-05-17）
 
-**架构重构（2026-04）+ 语音解析 v2 + 阶段 6 学习规则 + 类别重命名 + 多币种支持** 全部完成并部署。
+**架构重构 + 语音解析 v2 + 学习规则 + 多币种 + 多笔切分 + 动词优先词典 + 手动记账时间滚轮 + Google OAuth + 品牌图标** 全部完成并部署。
 
-- `index.html` 516 行（入口 + ~160 行胶水 inline）
+- `index.html` ~520 行（入口 + ~160 行胶水 inline）
 - 36+ 个 JS 模块 ~8200 行，严格三层架构（utils → domain → state → ui）
 - 一句话记账：**v2 已在生产启用**（`USE_VOICE_V2 = true`）；v1 仍保留作回滚
 - 多币种：支持 EUR / CNY / USD / GBP / JPY，基础币 = CNY，可启用任意子集
+- 登录：邮箱密码 + Google OAuth 两条线都可用（Testing 模式，测试用户白名单制）
 
 ## 部署
 
@@ -19,122 +20,146 @@
 - 开发：Cursor Live Server 右键主项目根目录的 `index.html`（**别在 `.claude/worktrees/*` 下跑**）
 - 推送：`git push` → 等 1 分钟 → 手机无痕模式刷新
 - **当前线上**：`USE_VOICE_V2 = true`，跑 v2
+- **Supabase**：`bsmwrjigxmhqcgspulyr`（CNY-base 多币种、行级安全、auth + 同步）
+- **Google OAuth**：`abiding-root-494804-v2` 项目，App name "Sunnn记账"，Testing 模式，测试用户 `yinzh812@gmail.com`，redirect URI 已配 Supabase callback；Client Secret 已轮换过一次（2026-05-17）
 
 ---
 
-## 本轮 Session（2026-05，post-2a0aad6）完成事项
+## 本轮 Session（2026-05-17，post-fba6082 → 919ded4）完成事项
 
-承接上一轮（v2 解析器 stages 1-4.1）。本轮新增：
+承接上一轮（多币种 + 学习规则 + 类别重命名）。本轮重点：**登录板块完善 + v2 多笔切分修复 + 词典动词优先重排 + 手动记账时间滚轮 + 品牌图标**。共 12 commit。
 
-### 1. v2 解析器正式上线（commit `5b22793`）
-- `config.js` 把 `USE_VOICE_V2 = false → true` → push
-- 线上从 v1 切到 v2
+### 1. 登录弹窗修缮（commit `5239c9c`）
 
-### 2. 默认类别重命名（commit `7a628a6`）
-单字偏好命名 → 通用二字：
-| 旧 | 新 |
-|---|---|
-| 吃 | 餐饮 |
-| 买 | 购物 |
-| 车 | 交通（不是"汽车"——因为覆盖地铁/公交/飞机；与 LEGACY_CAT_LUCIDE 的"交通"对齐）|
+- `onSyncStatus` 订阅 → `#auth-sync-status` 文字随状态自动刷新（之前写死 "未知"）
+- `signOut` 弹 confirm：「是否同时清除本设备上的本地账本数据？」
+  - 确定：清 txs/budgets/goals/deletedSugs/learnedRules/customCategories（共享设备友好）
+  - 取消：仅退出 session，本地保留（下次登录与云端合并）
+  - 顺序：先 `await signOut()` 让 user=null，再清 store → `cloudPushDebounced` 早返回，云端数据不会被本地空数组覆盖
+- 清掉 `ui/modals/auth.js:41` 的 stale TODO（按钮 onclick 已通过 inline + window 桥接绑定）
+- Supabase 未就绪文案修正：「云端连接异常」
 
-- `categories.js`：`DEFAULT_CATS_BY_TYPE.expense` 改名 + `CAT_DEFAULTS_VERSION` bump 触发 `customCategoriesByType` 重置
-- `categories.js` 新增 `CATEGORY_RENAME_V3` + `migrateLegacyTxCategoryNames` 帮手
-- `store.js hydrate`：一次性 tx 迁移（`txCategoryRenamedV3` flag 防重跑）
-- `parser.js` + `parser.v2.js` `voiceRemapCategoryByType` 返回新名（dict 内部标签仍是"吃/玩/购物/其他"，只在 remap 时换 UI 名）
-- `LEGACY_CAT_LUCIDE` 加旧名兜底（兼容历史 tx 图标查询）
+### 2. 修 `index.html:453` inline applyTheme 启动报错（commit `0151050`）
 
-### 3. 阶段 6 学习规则（commits `3f54d5a` → `54c5cdf` → `2a11f79`）
+inline 同步执行时模块尚未加载，调 `applyTheme()` 会 ReferenceError。该函数已迁移到 `settingsTab.applyTheme`，由 `main.js bootstrap()` 调用，删除 inline 调用即可。
 
-让 v2 学用户的类别纠正：弹窗里改类别 → 系统记 `(phrase, type) → category`，下次自动用。
+### 3. 清掉 EUR-base 旧 API（commit `9e66636`）
 
-**架构**：
-```
-src/domain/learning.js          ← 纯函数：record/forget/find/apply/bump/clear
-src/domain/learning.test.js     ← 29 条 Node 单测
-src/state/storage.js            ← LEARNED_RULES key = "acct_learnedRules"
-src/state/store.js              ← state.learnedRules + 4 setter
-src/ui/modals/confirm.js        ← doConfirm 时比较 _origCategory ≠ category → addLearnedRule
-src/ui/modals/input.js          ← parseVoiceText 传 learnedRules option
-src/domain/voice/parser.v2.js   ← applyLearnedRules 子串匹配 + 最长优先，覆盖 voiceRemap
-src/ui/tabs/settings.js         ← "我的个人词典" section（删/清空）
-```
+多币种重构（CNY-base）完成后，`toEur/netInEur/sumByTypeInEur/cnyToEur/totalSavingsInEur/safeRate` 6 个函数已无业务调用，仅作兼容垫片留存。
 
-**关键决策**：
-- phrase 用 `voiceCleanDesc` 输出（短词、去日期/金额/分隔词后剩的）
-- (phrase, type) 复合键 — 同 phrase 不同 type 分别存
-- 子串匹配 + 大小写不敏感 + 最长优先
-- 学到的 category 优先级 > parser 推断
-- 短 phrase (< 2 字) 与兜底 "消费" 拒收
-- **不同步 Supabase**（仅 localStorage），多设备各自学
-- 设置页里可看/删/清空
+- `domain/currency.js`：删 6 个 EUR helpers，保留 `DEFAULT_EUR_TO_CNY` 给 `store.hydrate` 做老 localStorage 字段迁移
+- `main.js`：删 `window.rate/netV/sumT` 桥（inline 早已迁），删未用 import；删 `window.setRate`（settingsTab.setRate 已不存在）
+- `ui/tabs/main.js`：删未用的 import
+- `ui/tabs/settings.js`：
+  - 删 `setRate`（旧版单一汇率 UI 已被多币种 UI 取代）
+  - `doExportRange` 文本账单从 `sumByTypeInEur(€)` 迁到 `sumByTypeInCny + convertAmount`，符号用 `currencySymbol(defaultCurrency)`（修了"导出账单文本永远显示 €"的 bug）
+  - CSV 导出 fallback currency 从 `"EUR"` 改为 `"CNY"`
+  - 文本账单 per-line 显示符号从硬编码 `¥/€` 改为 `currencySymbol(t.currency)`（支持 USD/GBP/JPY）
 
-**还顺手修了 voice dict bug**（commit `8e276f4`）：`VOICE_INCOME_KW` 里的单字 "卖/退/赚/挣" 会撞 "外卖/退步" 等，导致 `吃饭100` 被错判 income。改成完整词形 "卖掉/卖了/卖书/卖出/退款/退钱/退我/退回/退还" 等。
+### 4. v2 多笔切分 bug 修复（commit `8a322de`）
 
-### 4. 类别管理 UX 大修（commits `2edf785` + `1b220ce`）
+修复"今天加油300，然后超市买了牛奶和面包，还吃了快餐"被切成 1 笔的 bug。用户期望切 3 笔（无金额段也保留为独立 tx，弹窗补录金额）。
 
-| 问题 | 修复 |
-|---|---|
-| 类别管理重排顺序后，手动记账面板的类别行不刷新 | inline `saveCustomCategories()` 只写 localStorage，不通知 store。在 main.js `hookInlineSaves` 里包一层 → `store.setCustomCategoriesByType()` → emit `cats:changed`；manual.js / detail.js 订阅 → 重建 |
-| 详情页类别选择框需要"管理"入口 | 蓝框右下加齿轮按钮 → `openCatSettings()`；齿轮做成 absolute 子节点，挂在 `#dt-cat-grid` 内部，带 `padding-bottom:42px` 腾空间 |
-| 点齿轮后类别管理被详情面板遮住 | `ov-catsettings` 加 `style="z-index:85"`（详情默认 60），保证类别管理盖在详情之上 |
-| 手动记账类别行横向滚动，超过 4 个要左右滑 | `.manual-cat-row` 从 `flex+overflow-x:auto` 改成 `grid;repeat(4,1fr)` —— 4 个一行自动换行 |
+**parser.v2.js**：
+- `voiceSplitInput`：原本无金额段会被合并进上一段（导致丢失），改为保留为独立段。只丢 1 字 / 纯感叹词噪音（嗯/哦/啊/呃/额/哎/呀/噢/喔/嘿/嘛/呵/哈/嗨）
+- `parseVoiceText`：多笔切分后处理两步：
+  1. **precision=day 且日期为今天 → ts 改为"现在"**（用户说"今天 X、Y、Z" 但没提具体时间时，期望 3 笔都接近当前时刻，而非全压到今天 noon）
+  2. **ts 严格递增**（同时刻的段每段差 1 秒），让"最后说的"显示在明细页最上方
+- 单笔（`results.length<=1`）不做这两步，无回归风险
 
-### 5. 多币种支持（Task 1 + Task 2，commits `35ea096` → `ded880a` → `94f1b34` → `ef08952` → `f185c76` → `e0416e5`）
+**confirm.js `showAmtPrompt`**：加可选 `onSuccess(result)` 回调
+- 提供时：填完仅调回调，不自动跳确认页（调用方编排）
+- 不提供时：保持老行为（单段直接转 confirm）
 
-**Task 1**：手动记账左上角加圆形货币切换按钮（与 hero 右上角同款）
-- `index.html`：删 `manual-cur-row`，在 `manual-type-bar` 内左上加 `<div id="manualCurToggleBtn">`
-- `manual.js` `selCurToggle()`：循环 `enabledCurrencies`
-- `components.css` 加 `.manual-cur-toggle` 样式
+**input.js `_afterParse`**：链式处理多个 needAmt 段
+- 原本若有 valid 且有 needAmt，needAmt 直接被丢弃（隐性 bug）
+- 现在逐个弹补录窗，全部填完后统一进 confirm 页
 
-**Task 2**：多币种存储、UI、显示
+**tests.v2.js**：加多笔切分断言（段数=3 / 金额=[300,null,null] / ts 递增）
 
-支持 5 个币种：
-```js
-SUPPORTED_CURRENCIES = [
-  { code: "CNY", symbol: "¥", label: "人民币" },  // 基础
-  { code: "EUR", symbol: "€", label: "欧元" },
-  { code: "USD", symbol: "$", label: "美元" },
-  { code: "GBP", symbol: "£", label: "英镑" },
-  { code: "JPY", symbol: "¥", label: "日元" },
-];
-```
+### 5. 手动记账：时段选择器（chip 行 → 时间滚轮）
 
-**数据层**（`domain/currency.js` + `state/store.js`）：
-- `SUPPORTED_CURRENCIES` / `DEFAULT_RATES_TO_CNY`（每币种 1 单位 = N CNY）
-- `rateToCny` / `toCny` / `fromCny` / `convertAmount`：通用换算
-- `txToCny` / `netInCny` / `sumByTypeInCny`：交易聚合（CNY 基础）
-- 旧 API（`toEur` / `netInEur` / `sumByTypeInEur`）保留，兼容老调用
-- `DEFAULT_SETTINGS` 加 `enabledCurrencies: ["EUR","CNY"]` + `ratesToCny: {CNY:1, EUR:7.8, USD:7.2, GBP:9.3, JPY:0.047}`
-- `hydrate` 兼容：老 `eurToCny` 自动同步进 `ratesToCny.EUR`
-- `setSettings` 双向同步 `eurToCny ↔ ratesToCny.EUR`，CNY 永远 = 1
+**第一版 chip 行**（commit `2aa8fe5`）—— 加 8 个时段词 chip（早上/上午/.../凌晨）。
 
-**UI 层**：
-- `settings.js` 货币与汇率卡完全重写：
-  - 默认货币：dropdown
-  - 启用列表：默认只显示已启用的（基础 CNY + 用户加的）
-  - "+ 添加货币" 内嵌 select 选未启用的
-  - 每行（非 CNY）有汇率输入 + × 移除
-- `main.js` `toggleDisplayCurrency()` 循环 enabled
-- `main.js` `renderHero()` 用 CNY 聚合 + `convertAmount` 转 dispCur
-- `confirm.js` / `detail.js`：货币显示用 `currencySymbol()` + `curDisplay()`，`editCurrency` / `detailEditCur` 循环 enabled
+**用户反馈后改成时间滚轮**（commit `8c8e0d6` 后半段）：用户觉得 chip 不够精准，要求把 `📅 今天` 按钮拆上下两半（上半日期 / 下半时间滚轮）。复用现有的 `openWheelTime(h, m, cb)` 组件，精确到分。
 
-**关键修复**（commit `ef08952`）：之前一句话 "吃饭100" 不跟随默认货币 → 不是 parser 问题，是 confirm.js 多处硬编码 `t.currency === "CNY" ? "¥" : "€"`。改用 `currencySymbol()`。
+- `index.html`：mcb-date 单元格拆为两个 `.mdt-half`（上 `.mdt-date` 含原 native picker，下 `.mdt-time` 调 `openMcTimeWheel`）；删 `#mcPeriodRow`
+- `components.css`：删 `.period-row/.period-chip`，加 `.mc-calc .mcb.mcb-date{flex-direction:column;...}` + `.mdt-half`
+- `manual.js`：
+  - 删 `mcPeriod/PERIOD_HOURS/selectPeriod/syncPeriodRow` 整套
+  - 加 `mcTime = {h, m} | null` 状态（null = 用当前实时时间）
+  - 加 `openMcTimeWheel` 导出 + `updateMcTimeBtn` 同步标签
+  - `submitManual` ts 三分支：
+    - 选了 mcTime → 当日 + h:m，`precision="exact"`
+    - 没选 + 非今日 → 当日 12:00，`precision="day"`（修了"昨天交易显示当前时间"bug）
+    - 没选 + 今天 → 当前实时，`precision="exact"`
+  - 编辑现有 tx 时 mcTime 从 `t.ts` 读回（仅当 `precision="exact"`）
+- `main.js`：`window.selectPeriod` → `window.openMcTimeWheel`
 
-**最终行为表**（commit `e0416e5` 终态）：
-| 显示位置 | 跟随什么 |
-|---|---|
-| 交易条右侧金额 | `tx.currency`（每笔自己的，不变）|
-| 当日分组头"收 / 支" | **`settings.defaultCurrency`** |
-| Hero 顶部圆按钮 + 大数字 | **`settings.displayCurrency`**（顶部按钮临时切）|
-| 分析页饼图中央 + 类别排行 + 预算 + 储蓄目标 | **`settings.defaultCurrency`** |
-| 一句话/手动新建的交易 | 用户选的 currency（默认从 `defaultCurrency` 来）|
+### 6. 词典动词优先重排（commit `8c8e0d6` 前半段）
 
-`main.js mainTab.init()` 和 `analysis.js init()` 都订阅了 `settings:changed` → 改默认货币后立刻刷新。
+用户反馈："动词优于名词"。原 parser 顺序导致：
+- "超市买牛奶面包" → 误判 餐饮（牛奶/面包是 吃 词典名词，吃-dict 优先于 购物-dict）
+- "吃了快餐" → 误判 其他
+
+**修复**：`voiceRemapCategoryByType` 在交通/运动之后、逐字典之前加两条 pre-check：
+- 餐饮强动词 `/吃|喝|用餐|进餐|eat|drink|dine|brunch/i` → 直接 餐饮
+- 购物动词 `/买|购|网购|下单|shopping/i` → 直接 购物
+- 同时 `快餐` 加进 吃 词典（无动词时如 "今天快餐30" 也能正确归 餐饮）
+
+**边界**：「买单 300」会被判 购物（餐饮场景但用了"买"字）；依赖用户的学习规则纠正。
+
+### 7. 词典大扩 + 运动图标改网球 + 修打球归类（commit `ff89042`）
+
+用户反馈："打球被归类成其他，应该是运动；默认运动图标是杠铃请换成网球；还有很多词识别不出来"。
+
+**图标**：
+- `domain/categories.js`：运动默认 `lucide:dumbbell` → `lucide:tennis-ball`
+- `CAT_DEFAULTS_VERSION` bump → `2026-05-17-v4` 触发已存用户的默认类别重置
+- `LEGACY_CAT_LUCIDE` 同步更新
+- `utils/icons.js`：新增 `tennis-ball` SVG（Lucide 没收录，自绘 1 圆 + 2 弧线）
+
+**parser.v2.js 类别正则扩充**：
+- 交通：+出租 +lyft +加油站 +班车/校车/大巴/长途车/巴士 +网约车/拼车/顺风车 +共享单车/摩拜/哈罗/青桔 +电动车/电瓶车/摩托车 +船票/轮船/邮轮/渡轮 +年检/检车 +地铁卡/公交卡/一卡通
+- 运动：**+打球**（用户案例）+踢球 +球场/游泳池 +排球/volleyball +棒球/baseball +橄榄球/rugby +高尔夫/golf +跳绳 +滑板/skateboard +武术/跆拳道/空手道/击剑 +蹦极/蹦床 +私教课/团操/健身卡
+
+**dictionary.v2.js VOICE_CAT_MAP + BRAND_MAP 扩**：
+- 吃：+烤肉/烤鸭/烤鱼/烤串/烤冷面 +自助餐/buffet +海底捞/必胜客/subway/赛百味 +茶颜悦色/古茗/茉酸奶/沪上阿姨 +螺蛳粉/酸辣粉/凉皮/肉夹馍/煎饼果子/鸡蛋灌饼/油泼面 +臭豆腐/烤红薯/糖葫芦 +关东煮 +炒饭/炒面/盖浇饭/卤味/汤面 +元气森林/农夫山泉 +酒类细分（whisky/vodka/gin/朗姆/清酒/sake）+茶/龙井/普洱/抹茶 +海鲜锅/干锅/酸菜鱼/水煮鱼/回锅肉/宫保鸡丁/麻婆豆腐/鱼香肉丝
+- 购物：+7-eleven/罗森 +卫生纸/抽纸/卷纸/湿巾/卫生巾 +五金/工具/螺丝/胶水/插座/灯泡 +家电系列 +小米/华为/sony/mac/apple store +香水 +美瞳/眼镜/太阳镜 +防晒/乳液/精华/眼霜 +大牌护肤美妆（lancome/sk-ii/ysl/dior/chanel/lv/prada/gucci 等）+玩具/积木/乐高/拼图 +decathlon/迪卡侬/ikea/宜家/costco/山姆/沃尔玛/best buy +商场/购物中心/百货/超市/便利店/屈臣氏
+- BRAND_MAP：把上面的连锁品牌也加进直查
+
+24 个 ad-hoc spot-check 全部分类正确；v1 11/11、v2 44/44 + 多笔断言均无退化。
+
+### 8. Favicon / 品牌图标（5 commits：`0baa42d` → `5145b56` → `5dd87a0` → `a55286a` → `919ded4`）
+
+设计：**薄荷绿账本（#A8DCC6）+ 装订线（#7BB89A）+ 右侧 3 层书页堆叠 + 中央偏左黄色 $（#F4C430）**。
+
+- `favicon.svg`：64×64 viewBox，全画布铺满（避免 iOS apple-touch-icon 加黑边）
+- 用 sharp 渲染 PNG 三个尺寸：`favicon-180.png`（iOS）/ `favicon-192.png`（Android）/ `favicon-512.png`（高分启动屏）
+- `index.html` 加 4 条 link：svg + 3 个 PNG，带 `?v=N` cache-buster（iOS Safari 对 apple-touch-icon 缓存极顽固，URL 变才会重取）
+- 渲染脚本：临时 `npm install --no-save sharp` → 用完 `rm -rf node_modules package-lock.json`
+- 未提交到 git 的临时文件：`google-app-logo-240.png`（Google OAuth consent screen 上传用，已交付用户）
+
+**iOS 缓存清理流程**：删桌面图标 → 关闭 Safari 后台 → 设置-Safari-高级-网站数据-删 `yinzh812.github.io` → 重新加到主屏。`?v=N` cache-buster 已能解决大部分情况。
+
+### 9. Google OAuth 配置（运维，非代码）
+
+代码侧 [auth.js:110-119](src/state/auth.js:110) `signInWithGoogle()` 早已写好。本轮仅完成运维配置：
+
+| Step | 在哪 | 做了什么 |
+|---|---|---|
+| 1 | Google Cloud Console | 项目 `abiding-root-494804-v2`（"Sunnn"）|
+| 2 | Google Auth Platform → 品牌塑造 | App name = `Sunnn记账`，Logo 用 favicon 240×240 PNG，support email = yinzh812@gmail.com |
+| 3 | Google Auth Platform → 目标对象 | Testing 模式，测试用户加 `yinzh812@gmail.com` |
+| 4 | Google Auth Platform → 客户端 | 建 Web 应用 OAuth Client，已授权 JS 来源 = `https://yinzh812.github.io`，redirect URI = `https://bsmwrjigxmhqcgspulyr.supabase.co/auth/v1/callback` |
+| 5 | Supabase → Auth → Providers → Google | Enable + 填 Client ID + Client Secret + Save |
+| 6 | Google Auth Platform → 客户端 → 客户端密钥 | 轮换：加新 secret + 同步到 Supabase + 删旧 secret |
+
+**已知限制**：Testing 模式下 Google 把 OAuth refresh token 限制为 7 天有效；超期用户需重新授权（"Access blocked" 提示）。要解此限需切到 Production + 通过 Google 验证（中等工作量、不紧急）。
 
 ---
 
-## 学习规则使用方法（阶段 6 成果）
+## 学习规则使用方法（前轮成果）
 
 ### 控制台
 ```js
@@ -153,14 +178,14 @@ acct.store.clearLearnedRules()
 
 ### 测试
 ```js
-runVoiceTestsV2()       // 44/44（+ 1 known edge）
-runVoiceTests()         // v1 原版 11/11（不受 v2 影响）
+runVoiceTestsV2()       // v2 44/44 + 多笔断言（multiOk: true）
+runVoiceTests()         // v1 11/11（不受 v2 影响）
 ```
-Node 端：`node --input-type=module -e "import('./src/domain/learning.test.js').then(m => m.runLearningTests())"` → 29/29
+Node 端：`node --input-type=module -e "import('./src/domain/voice/tests.v2.js').then(m => m.runVoiceTestsV2())"`
 
 ---
 
-## 多币种使用方法
+## 多币种使用方法（前轮成果）
 
 ### 启用新货币
 1. 设置 → 货币与汇率 → "+ 添加货币" 下拉选（如美元）
@@ -190,11 +215,22 @@ export const USE_VOICE_V2 = true;  // 改成 false 即回滚到 v1
 
 ## 已知边界 / 待办
 
-- **多笔切分 + v2**：`今天加油300，然后超市买了牛奶和面包，还吃了快餐` 切分后无金额段会合并为单笔（v1 同行为；后续阶段可优化）
-- **`kevin赌我最后一球不进100rmb`**：v2 仍误把"最后"当切分词（known edge，v1 同）
-- **手动记账（manual.js）**：不产生 `timePhrase`，所以 daytime 精度只来自语音输入
+**仍未解决**：
+- **`朋友赌我最后一球不进100rmb`**：v2 仍误把"最后"当切分词（known edge，v1 同；测试用例标 `knownEdge: true`）
 - **学习规则不跨设备**：仅 localStorage；想 Supabase 同步需要新增 sync 字段
-- **`index.html:454`** inline `applyTheme()` 在 main.js 加载前调用 → 控制台报错，但不影响功能。修法：删 inline 调用，依赖 `main.js bootstrap()`。
+- **Google OAuth Testing 模式 7 天限**：refresh token 7 天后失效；要永久需上 Production + Google 验证
+- **Supabase 自动暂停**：免费版项目长时间不活跃会暂停（已遇到一次）；建议每周打开一次 Dashboard 或 app
+- **"买单 300"**：餐饮场景但用了"买"字，会被判 购物；依赖用户用学习规则纠正
+- **词典持续扩**：永远不够。当前已大批量扩；继续按用户反馈补
+- **Google 登录页显示 supabase URL**：`继续前往 bsmwrjigxmhqcgspulyr.supabase.co` 是 OAuth 设计强制（redirect URI 的 hostname），无法改；如要美化需 Supabase Pro 自定义域名 ($25/月)
+- **iOS 部分老版本对 SVG apple-touch-icon 兼容差**：已用 PNG 兜底；如未来要求严格统一可手工出 1024×1024 + macOS touch bar 尺寸
+
+**本轮已解决**（历史归档）：
+- ✅ ~~多笔切分 + v2 合并为单笔~~
+- ✅ ~~手动记账无 daytime 精度~~（换成时间滚轮，更精确）
+- ✅ ~~index.html:454 inline applyTheme()~~
+- ✅ ~~`超市买X` 误判餐饮 / `吃了快餐` 误判其他~~
+- ✅ ~~`打球` 归 其他~~
 
 ---
 
@@ -205,76 +241,148 @@ src/domain/voice/
 ├─ config.js          USE_VOICE_V2 开关
 ├─ parser.active.js   按开关分发 v1/v2
 ├─ parser.js          v1（不动）
-├─ dictionary.js      v1 词典（'卖/退/赚/挣' 单字已移除）
+├─ dictionary.js      v1 词典
 ├─ tests.js           v1 回归 11/11
-├─ parser.v2.js       v2（含 learning 接入）
-├─ dictionary.v2.js   v2 词典
+├─ parser.v2.js       v2（+ 动词优先 pre-check + 多笔切分后处理）
+├─ dictionary.v2.js   v2 词典（大扩，含 BRAND_MAP）
 ├─ preprocess.js      v2 预处理
-└─ tests.v2.js        v2 回归 44/44
+└─ tests.v2.js        v2 回归 44/44 + 多笔断言
 
 src/domain/
-├─ categories.js      DEFAULT_CATS_BY_TYPE（餐饮/购物/交通）+ CAT_DEFAULTS_VERSION='2026-05-14-v3' + migrateLegacyTxCategoryNames
-├─ currency.js        SUPPORTED_CURRENCIES + ratesToCny 系列 + convertAmount + 旧 EUR API
-├─ dates.js           formatTransactionTime 支持 daytime
-├─ learning.js        学习规则纯函数 (record/forget/find/apply/bump/clear)
-└─ learning.test.js   29 单测
+├─ categories.js      DEFAULT_CATS_BY_TYPE（运动图标=tennis-ball）+ CAT_DEFAULTS_VERSION='2026-05-17-v4'
+├─ currency.js        CNY-base API（rateToCny/toCny/fromCny/convertAmount/txToCny/netInCny/sumByTypeInCny）+ DEFAULT_EUR_TO_CNY（兼容老 localStorage 字段）
+│                     [旧 EUR API toEur/netInEur/sumByTypeInEur/cnyToEur/totalSavingsInEur/safeRate 已全部删除]
+├─ dates.js
+├─ learning.js
+└─ learning.test.js
 
 src/state/
-├─ storage.js         + LEARNED_RULES key + loadLearnedRules/saveLearnedRules
-└─ store.js           + state.learnedRules + 4 setter + DEFAULT_SETTINGS 加 enabledCurrencies/ratesToCny + hydrate 自动迁移
-                      + setSettings 双向同步 eurToCny ↔ ratesToCny.EUR
-                      + 一次性 tx category v3 重命名迁移（flag: txCategoryRenamedV3）
+├─ storage.js
+├─ store.js
+├─ auth.js            Supabase client 懒加载 + signUp/signIn/signOut/Google OAuth/sendPasswordResetEmail/restoreSession
+└─ sync.js            onAuthChange→cloudPull→cloudPush；onSyncStatus 事件流
 
 src/ui/tabs/
-├─ main.js            renderList 分组头跟 defaultCurrency；订阅 settings:changed → 刷列表
-├─ analysis.js        全面去 EUR-base；按 defaultCurrency 显示；订阅 settings:changed
-└─ settings.js        + 货币与汇率卡（dropdown + 已启用列表 + "+ 添加货币" + 汇率输入 + × 移除）
-                      + 我的个人词典卡（学习规则 UI）
-                      + 订阅 cats:changed / learnedRules:changed 自动刷新
+├─ main.js            （删 EUR helpers import）
+├─ analysis.js
+└─ settings.js        （删 setRate；doExportRange 文本账单走 sumByTypeInCny）
 
 src/ui/modals/
-├─ input.js           parseVoiceText 传 learnedRules option
-├─ confirm.js         doConfirm 时 addLearnedRule；货币显示用 currencySymbol；editCurrency 循环 enabled；快照 _origCategory
-├─ detail.js          货币显示用 curDisplay；detailEditCur 循环 enabled；类别选择框右下角齿轮；订阅 cats:changed
-└─ manual.js          左上圆形货币按钮 selCurToggle 循环 enabled；订阅 cats:changed 重建类别行
+├─ input.js           _afterParse 链式补录金额（多 needAmt 段逐个 prompt）
+├─ confirm.js         showAmtPrompt 加 onSuccess 回调；货币显示用 currencySymbol
+├─ detail.js
+├─ manual.js          mcTime 状态 + openMcTimeWheel + updateMcTimeBtn（替换前轮 mcPeriod/PERIOD_HOURS）
+└─ auth.js            onSyncStatus 订阅 → 同步状态实时刷新；signOut 弹 confirm 询问是否清本地
 
-styles/components.css 加 .manual-cur-toggle / .cur-row / .cur-row-x / .seg-btn-locked
+src/utils/
+└─ icons.js           +tennis-ball SVG
 
-index.html 改：ov-catsettings 加 style="z-index:85"；manual-type-bar 左上加 manualCurToggleBtn；删 manual-cur-row
+styles/components.css
+  +.mc-calc .mcb.mcb-date{flex-direction:column}（拆上下两半）
+  +.mdt-half (.mdt-date / .mdt-time)
+  [-.period-row / -.period-chip 已删（被时间滚轮取代）]
+
+index.html
+  +<meta name="mobile-web-app-capable">
+  +<link rel="icon" type="image/svg+xml" href="favicon.svg?v=3">
+  +<link rel="icon" type="image/png" sizes="192x192"|"512x512">
+  +<link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png?v=3">
+  mcb-date 拆成 .mdt-date (含 native date input) + .mdt-time (调 openMcTimeWheel)
+  删 inline applyTheme() 调用
+
+(项目根目录)
+favicon.svg          薄荷绿账本（铺满画布 + 装订线 + 右侧 3 层书页堆叠 + 居中偏左黄 $）
+favicon-180.png      iOS apple-touch-icon
+favicon-192.png      Android home screen
+favicon-512.png      高分启动屏
 ```
 
 ---
 
-## Git 提交历史（本轮 session 全量）
+## Git 提交历史（本轮 session 全量，按时间倒序）
 
 ```
-e0416e5 @ 列表分组头 & 分析页改用'默认货币'（settings.defaultCurrency）
-f185c76 @ 列表分组头按显示币种渲染（误跟了 displayCurrency，被上一行修正）
-ef08952 @ 多币种 UI 修复轮 3：默认值生效 + 卡片只显已启用 + 颜色一致
-94f1b34 @ 多币种 UI 修复轮 2：设置卡重设计 + 详情页跟随启用列表
-ded880a @ 多币种支持（Task 2）：5 个币种 + 设置页下拉/勾选/多汇率 + Hero 循环
-35ea096 @ 手动记账：货币按钮改成左上角圆形切换（Task 1）
-1b220ce @ 类别 UI 修复 2 轮：手动记账 4 列换行 + 详情齿轮位置 + cat-settings z-index
-2edf785 @ 类别管理 UX 修复 + 详情类别框加齿轮按钮
-8e276f4 @ 修 voice dict：去掉 income KW 里的单字'卖'/'退'/'赚'/'挣'
-2a11f79 @ v2 阶段 6.3：设置页 '我的个人词典' UI
-54c5cdf @ v2 阶段 6.2：学习规则消费方接入（功能闭环）
-3f54d5a @ v2 阶段 6.1：学习规则模块 + 持久化 + store 接入（无 UI）
-7a628a6 @ 默认类别重命名：吃/买/车 → 餐饮/购物/交通
-5b22793 @ 启用 v2 解析器（USE_VOICE_V2: false → true）
-2a0aad6 @ 更新 SESSION-NOTES：归档 v2 解析器全部阶段成果（上轮 session 收尾）
+919ded4 favicon 增加书页堆叠效果 + $ 左移
+a55286a favicon 加 ?v=2 cache-buster，强制 iOS Safari 重取图标
+5dd87a0 favicon 全画布铺满，避免 iOS 加黑边
+5145b56 加 favicon PNG（180/192/512）解决 iOS 主屏图标问题
+0baa42d 加 favicon.svg（薄荷绿账本 + 黄色 $）
+ff89042 扩词库 + 运动图标换成网球 + 修打球归类
+8c8e0d6 首轮验证反馈修复：deprecated meta + 时段→滚轮 + 词典动词优先
+8a322de v2 多笔切分：保留无金额段 + 逐段补录金额 + ts 严格递增
+2aa8fe5 手动记账：加时段选择器（早上/上午/中午/下午/傍晚/晚上/半夜/凌晨）  [已被 8c8e0d6 替换为时间滚轮]
+9e66636 清掉 EUR-base 旧 API：toEur/netInEur/sumByTypeInEur/cnyToEur/totalSavingsInEur/safeRate
+0151050 修 index.html:453 inline applyTheme() 启动报错
+5239c9c 登录弹窗：同步状态实时刷新 + signOut 询问是否清本地
 ```
+
+---
+
+## 上一轮 Session（2026-05，post-2a0aad6 → fba6082）摘要
+
+承接上上轮（v2 解析器 stages 1-4.1）。15 个 commit。详细决策记录如下：
+
+### v2 解析器正式上线（commit `5b22793`）
+`config.js` 把 `USE_VOICE_V2 = false → true` → push。线上从 v1 切到 v2。
+
+### 默认类别重命名（commit `7a628a6`）
+单字偏好 → 通用二字：`吃→餐饮 / 买→购物 / 车→交通`。
+- `categories.js`：`DEFAULT_CATS_BY_TYPE.expense` 改名 + `CAT_DEFAULTS_VERSION` bump
+- 新增 `CATEGORY_RENAME_V3` + `migrateLegacyTxCategoryNames` 帮手
+- `store.js hydrate`：一次性 tx 迁移（`txCategoryRenamedV3` flag 防重跑）
+- `LEGACY_CAT_LUCIDE` 加旧名兜底
+
+### 阶段 6 学习规则（commits `3f54d5a` → `54c5cdf` → `2a11f79`）
+让 v2 学用户的类别纠正。架构：
+```
+src/domain/learning.js          ← 纯函数：record/forget/find/apply/bump/clear
+src/domain/learning.test.js     ← 29 条 Node 单测
+src/state/storage.js            ← LEARNED_RULES key = "acct_learnedRules"
+src/state/store.js              ← state.learnedRules + 4 setter
+src/ui/modals/confirm.js        ← doConfirm 时 _origCategory ≠ category → addLearnedRule
+src/ui/modals/input.js          ← parseVoiceText 传 learnedRules option
+src/domain/voice/parser.v2.js   ← applyLearnedRules 子串匹配 + 最长优先
+src/ui/tabs/settings.js         ← "我的个人词典" section
+```
+
+关键决策：phrase 用 `voiceCleanDesc` 输出；(phrase, type) 复合键；子串匹配 + 最长优先；学到的优先级 > parser 推断；短 phrase < 2 字与兜底 "消费" 拒收；不同步 Supabase。
+
+顺手修了 voice dict bug（commit `8e276f4`）：`VOICE_INCOME_KW` 单字 "卖/退/赚/挣" 撞 "外卖/退步"，改成完整词形。
+
+### 类别管理 UX 大修（commits `2edf785` + `1b220ce`）
+- inline `saveCustomCategories()` → 包装走 store（emit cats:changed）
+- 详情页类别选择框加齿轮按钮（manual / detail 订阅 cats:changed 重建）
+- `ov-catsettings` z-index:85
+- 手动记账类别行 `grid;repeat(4,1fr)`（自动换行，不再横向滚）
+
+### 多币种支持（commits `35ea096` → `ded880a` → `94f1b34` → `ef08952` → `f185c76` → `e0416e5`）
+- 5 个币种（CNY 基础）+ 启用列表 + 多汇率
+- 手动记账左上加圆形货币按钮（与 hero 顶部同款）
+- `domain/currency.js`：`SUPPORTED_CURRENCIES` / `DEFAULT_RATES_TO_CNY` / `rateToCny/toCny/fromCny/convertAmount` / `txToCny/netInCny/sumByTypeInCny`
+- `DEFAULT_SETTINGS` 加 `enabledCurrencies` + `ratesToCny`；`hydrate` 兼容老 `eurToCny`；`setSettings` 双向同步
+- `settings.js` 货币卡完全重写（默认 dropdown / 启用列表 / + 添加货币 / 每行汇率输入 + × 移除）
+- 关键修复 `ef08952`：confirm.js 多处硬编码 `t.currency === "CNY" ? "¥" : "€"` 改用 `currencySymbol()`
+
+最终行为表：
+| 显示位置 | 跟随什么 |
+|---|---|
+| 交易条右侧金额 | `tx.currency`（每笔自己的，不变）|
+| 当日分组头"收 / 支" | `settings.defaultCurrency` |
+| Hero 顶部圆按钮 + 大数字 | `settings.displayCurrency`（顶部按钮临时切）|
+| 分析页饼图中央 + 类别排行 + 预算 + 储蓄目标 | `settings.defaultCurrency` |
+| 一句话/手动新建的交易 | 用户选的 currency（默认从 `defaultCurrency` 来）|
+
+`mainTab.init()` 和 `analysis.js init()` 订阅 `settings:changed` → 即刷。
 
 ---
 
 ## 历史 Session 摘要
 
-### 2026-05（上一轮）：v2 解析器 stages 1-4.1
+### 2026-05（上上轮）：v2 解析器 stages 1-4.1
 - 8 个 commit（`262b22f` → `321cea6`）
 - v1/v2 并存架构 + `config.js` 开关
 - 预处理（emoji/全半角/错字）+ 中文数字 + 时间识别（含 daytime precision）
 - 抢救 master 上的另一份 v2 草稿（22 条匿名用例 + 词典抽象）
-- 详细见之前 SESSION-NOTES 的本节，本文已合并
 
 ### 2026-04：架构重构（90%）
 - `index.html` 2109 行 → 516 行
