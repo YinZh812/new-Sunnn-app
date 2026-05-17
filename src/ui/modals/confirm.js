@@ -18,7 +18,7 @@ import { store } from "../../state/store.js";
 import { getCategoryIcon, DEFAULT_CATS_BY_TYPE } from "../../domain/categories.js";
 import { SUPPORTED_CURRENCIES } from "../../domain/currency.js";
 import { renderIcon } from "../../utils/icons.js";
-import { formatTransactionFull } from "../../domain/dates.js";
+import { formatTransactionFull, formatTransactionTime } from "../../domain/dates.js";
 import { pad2, escapeHtml, formatAmount, currencySymbol } from "../../utils/format.js";
 
 // 货币 code → "中文名 符号"（如 "美元 $"）
@@ -121,17 +121,43 @@ function renderConfirmMulti() {
     const ico = getCatIcon(t.category);
     const s = sign(t);
     const sy = sym(t);
+    const timeFmt = formatTransactionFull(t);
     html += '<div class="mcard">' +
       '<div class="mcard-top">' +
         '<span class="mcard-idx">第' + (i + 1) + '笔</span>' +
-        '<span class="mcard-amt" style="color:' + amtColor(t) + '">' + s + formatAmount(t.amount) + ' ' + sy + '</span>' +
+        '<span class="mcard-amt mcard-edit" style="color:' + amtColor(t) + '" onclick="confMultiEditAmt(' + i + ')">' + s + formatAmount(t.amount) + ' ' + sy + ' ✎</span>' +
       '</div>' +
-      '<div class="mcard-desc" style="display:flex;align-items:center;gap:6px">' + ico + '<span>' + escapeHtml(t.desc) + '</span></div>' +
-      '<div class="mcard-meta">' + escapeHtml(t.category) + ' · ' + typeL(t.type) + ' · ' + (t.timeLabel || formatTransactionFull(t)) + '</div>' +
+      '<div class="mcard-desc" style="display:flex;align-items:center;gap:6px">' +
+        '<span class="mcard-edit" onclick="confMultiEditCat(' + i + ')" title="点击修改类别">' + ico + '</span>' +
+        '<span>' + escapeHtml(t.desc) + '</span>' +
+      '</div>' +
+      '<div class="mcard-meta">' + escapeHtml(t.category) + ' · ' + typeL(t.type) + ' · ' + timeFmt + '</div>' +
       (t.note ? '<div class="mcard-note">' + escapeHtml(t.note) + '</div>' : '') +
     '</div>';
   });
   body.innerHTML = html;
+}
+
+export function multiEditAmt(idx) {
+  const t = _pending[idx];
+  if (!t) return;
+  const v = prompt("修改金额", String(t.amount));
+  if (v === null) return;
+  const n = parseFloat(v);
+  if (isNaN(n) || n <= 0) return;
+  t.amount = n;
+  renderConfirmMulti();
+}
+
+export function multiEditCat(idx) {
+  const t = _pending[idx];
+  if (!t) return;
+  const cats = getCatsByType(t.type);
+  const names = cats.map((c) => c.name);
+  const cur = names.indexOf(t.category);
+  const next = (cur + 1) % names.length;
+  t.category = names[next];
+  renderConfirmMulti();
 }
 
 // ── 单笔渲染（含就地编辑入口） ──────────────────────────────────────────────

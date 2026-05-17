@@ -405,6 +405,8 @@ window.confEditDesc = confirmModal.editDesc;
 window.confEditCat  = confirmModal.editCategory;
 window.confEditType = confirmModal.editType;
 window.confEditCur  = confirmModal.editCurrency;
+window.confMultiEditAmt = confirmModal.multiEditAmt;
+window.confMultiEditCat = confirmModal.multiEditCat;
 window.showAmtPrompt = confirmModal.showAmtPrompt;
 window.showErr       = confirmModal.showErr;
 
