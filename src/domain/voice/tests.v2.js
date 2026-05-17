@@ -77,6 +77,14 @@ const CASES = [
 
 const MULTI_CASE = "今天加油300，然后超市买了牛奶和面包，还吃了快餐";
 
+// 多笔切分场景的断言（与 MULTI_CASE 对应）：3 笔，金额 [300, null, null]，ts 严格递增。
+const MULTI_EXPECT = {
+  count: 3,
+  amounts: [300, null, null],
+  // 严格递增：results[i].ts > results[i-1].ts
+  strictlyIncreasingTs: true,
+};
+
 /**
  * 跑全部用例。
  * @param {Object} [options]
@@ -137,9 +145,29 @@ export function runVoiceTestsV2(options = {}) {
   console.log(`输入：${MULTI_CASE}`);
   console.log(`切出 ${segs.length} 笔：`);
   console.table(segs.map((s, i) => ({
-    "#": i + 1, "金额": s.amount, "类型": s.type, "类别": s.category, "描述": s.desc,
+    "#": i + 1,
+    "金额": s.amount,
+    "类型": s.type,
+    "类别": s.category,
+    "描述": s.desc,
+    "ts": new Date(s.ts).toLocaleTimeString(),
   })));
+
+  // 断言：3 笔 / 金额 [300, null, null] / ts 严格递增
+  const countOk   = segs.length === MULTI_EXPECT.count;
+  const amountsOk = segs.length === MULTI_EXPECT.amounts.length &&
+    segs.every((s, i) => s.amount === MULTI_EXPECT.amounts[i]);
+  let tsOk = true;
+  for (let i = 1; i < segs.length; i++) {
+    if (!(segs[i].ts > segs[i - 1].ts)) { tsOk = false; break; }
+  }
+  console.log(
+    `断言 → 段数 ${countOk ? "✓" : "✗"} (${segs.length}/${MULTI_EXPECT.count})` +
+    ` · 金额顺序 ${amountsOk ? "✓" : "✗"}` +
+    ` · ts 严格递增 ${tsOk ? "✓" : "✗"}`
+  );
+  const multiOk = countOk && amountsOk && tsOk;
   console.groupEnd();
 
-  return { passed, total: totalActive, knownEdge: edgeCount };
+  return { passed, total: totalActive, knownEdge: edgeCount, multiOk };
 }

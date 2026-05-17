@@ -409,11 +409,17 @@ export function voiceSplitInput(text) {
   const rawParts = s.split("‖").map((p) => p.trim()).filter(Boolean);
   if (rawParts.length <= 1) return [text.trim()];
 
+  // 保留无金额段为独立段（后续 parser 会把它们标为 needAmountInput=true，
+  // confirm.js 流程会逐个弹窗补金额）。仅丢弃纯感叹词/单字噪音。
+  const INTERJECTION_RE = /^(嗯|哦|啊|呃|额|哎|呀|噢|喔|嘿|嘛|呵|哈|嗨)+$/;
   const parts = [];
   for (const p of rawParts) {
-    if (/\d/.test(p)) parts.push(p);
-    else if (parts.length > 0) parts[parts.length - 1] += " " + p;
-    else parts.push(p);
+    if (/\d/.test(p)) {
+      parts.push(p);
+    } else if (p.length >= 2 && !INTERJECTION_RE.test(p)) {
+      parts.push(p);
+    }
+    // 否则：单字 / 纯感叹词 → 丢弃
   }
   if (parts.length <= 1) return [text.trim()];
 
@@ -536,6 +542,28 @@ export function parseVoiceText(text, options) {
       timePhrase: dateInfo.timePhrase,
       yearOnly: null,
     });
+  }
+
+  // 多笔切分专属后处理：
+  //   1. 把 precision=day 且日期是今天 的段，ts 改成"现在"（用户说"今天 X、Y、Z"
+  //      但没提具体时间时，期望 3 笔都接近当前时刻，而非全压到今天 noon）
+  //   2. 保证 ts 严格递增，让"最后说的"显示在明细页最上方（列表按 ts 降序排）
+  //   单笔（results.length<=1）不做这两步，避免回归单笔测试
+  if (results.length > 1) {
+    const now = Date.now();
+    const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+    const tomorrow0 = today0.getTime() + 86400000;
+    for (const r of results) {
+      if (r.timePrecision === "day" && r.ts >= today0.getTime() && r.ts < tomorrow0) {
+        r.ts = now;
+        r.timePrecision = "exact";  // 改成精确，明细页显示具体时分
+      }
+    }
+    for (let i = 1; i < results.length; i++) {
+      if (results[i].ts <= results[i - 1].ts) {
+        results[i].ts = results[i - 1].ts + 1000;  // 同时刻的段每段差 1 秒
+      }
+    }
   }
   return results;
 }

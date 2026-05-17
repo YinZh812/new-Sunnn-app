@@ -311,7 +311,15 @@ export function editCurrency() {
 
 // ── 补录金额弹窗 ────────────────────────────────────────────────────────────
 
-export function showAmtPrompt(result) {
+/**
+ * 弹窗让用户补录单笔金额。
+ * @param {Object} result          parser 输出的单条 result（会被原地修改）
+ * @param {Function} [onSuccess]   用户填完金额后的回调（可选）
+ *   - 提供时：填完仅调 onSuccess(result)，不自动跳确认页（调用方负责后续编排，
+ *     比如多段连续补录）。
+ *   - 不提供时：兼容老行为——单段直接转到 confirm 页（_pending=[result]）。
+ */
+export function showAmtPrompt(result, onSuccess) {
   const slbl = byId("slbl");
   if (slbl) slbl.textContent = "补充金额";
 
@@ -335,11 +343,17 @@ export function showAmtPrompt(result) {
       result.amount = parseFloat(v.toFixed(2));
       result.ok = true;
       result.needAmountInput = false;
-      _pending = [result];
-      okBtn.onclick = doConfirm;
-      const ovInput = byId("ov-input");
-      if (ovInput) ovInput.style.display = "none";
-      showConfirm();
+      if (typeof onSuccess === "function") {
+        // 多段连续补录：把控制权交还调用方，由它决定下一步弹什么
+        onSuccess(result);
+      } else {
+        // 兼容老路径：单段直接进确认页
+        _pending = [result];
+        okBtn.onclick = doConfirm;
+        const ovInput = byId("ov-input");
+        if (ovInput) ovInput.style.display = "none";
+        showConfirm();
+      }
     };
   }
 

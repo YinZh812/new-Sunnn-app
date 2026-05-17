@@ -97,22 +97,47 @@ export function doSend() {
 }
 
 function _afterParse(results) {
-  const valid   = results.filter((r) => r.ok);
   const needAmt = results.filter((r) => r.needAmountInput);
 
-  if (!valid.length && needAmt.length) {
-    _confirmModal?.showAmtPrompt(needAmt[0]);
-    return;
-  }
-  if (!valid.length) {
+  // 没有任何段（含识别失败）
+  if (!results.length || (!results.some((r) => r.ok) && !needAmt.length)) {
     _confirmModal?.showErr("没能识别金额，请说明花了多少钱");
     return;
   }
 
-  const ovInput = byId("ov-input");
-  if (ovInput) ovInput.style.display = "none";
+  // 没有需要补录的段：直接进确认
+  if (!needAmt.length) {
+    const ovInput = byId("ov-input");
+    if (ovInput) ovInput.style.display = "none";
+    _confirmModal?.open(results.filter((r) => r.ok));
+    return;
+  }
 
-  _confirmModal?.open(valid);
+  // 有需要补录金额的段 → 依序逐个弹窗，全部填完后再统一进确认页
+  // 例：今天加油300，然后超市买了牛奶和面包，还吃了快餐
+  //   → 第 1 段已有金额；第 2、3 段挨个弹补录窗；最后 3 笔一起进 confirm
+  let qi = 0;
+  function nextPrompt() {
+    if (qi >= needAmt.length) {
+      // 所有 needAmt 段已补齐 → 统一打开确认页
+      const ok = results.filter((r) => r.ok);
+      if (!ok.length) {
+        _confirmModal?.showErr("没能识别金额，请说明花了多少钱");
+        return;
+      }
+      const ovInput = byId("ov-input");
+      if (ovInput) ovInput.style.display = "none";
+      _confirmModal?.open(ok);
+      return;
+    }
+    const r = needAmt[qi];
+    qi++;
+    _confirmModal?.showAmtPrompt(r, () => {
+      // showAmtPrompt 已把 r.amount/r.ok 写好；进入下一段
+      nextPrompt();
+    });
+  }
+  nextPrompt();
 }
 
 // ── 推荐词（aiSug） ─────────────────────────────────────────────────────────
