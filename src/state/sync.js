@@ -144,7 +144,7 @@ export async function cloudPull() {
     // 用户设置
     const rSet = await client
       .from("user_settings")
-      .select("settings,budgets,goals,custom_categories,deleted_sugs,updated_at")
+      .select("settings,budgets,goals,custom_categories,deleted_sugs,learned_rules,updated_at")
       .eq("user_id", user.id)
       .maybeSingle();
     if (rSet.error) throw rSet.error;
@@ -156,6 +156,7 @@ export async function cloudPull() {
       if (d.goals) store.setGoals(d.goals);
       if (d.custom_categories) store.setCustomCategoriesByType(d.custom_categories);
       if (d.deleted_sugs) store.setDeletedSugs(d.deleted_sugs);
+      if (d.learned_rules) store.setLearnedRules(d.learned_rules);
     }
 
     _hasInitialPull = true;
@@ -230,6 +231,7 @@ export async function cloudPush(forceAll = false) {
       goals: store.getGoals(),
       custom_categories: store.getCustomCategoriesByType(),
       deleted_sugs: store.getDeletedSugs(),
+      learned_rules: store.getLearnedRules(),
       updated_at: new Date().toISOString(),
     };
     const rs = await client.from("user_settings").upsert(setRow, { onConflict: "user_id" });
@@ -284,6 +286,7 @@ export function attachSync() {
     "goals:changed",
     "deletedSugs:changed",
     "cats:changed",
+    "learnedRules:changed",
   ];
   for (const evt of otherEvents) {
     store.on(evt, () => cloudPushDebounced());
