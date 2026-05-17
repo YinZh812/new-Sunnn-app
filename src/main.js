@@ -341,6 +341,7 @@ window.addNewCat          = settingsTab.addNewCat;
 // v2 阶段 6.3：个人词典 onclick 桥接
 window.removeLearnedRule  = settingsTab.handleRemoveLearnedRule;
 window.clearLearnedRules  = settingsTab.handleClearLearnedRules;
+window.resetApp           = settingsTab.resetApp;
 
 // ── 桥接输入流（doSend / openInputSheet / chooseCurrency / clearInputField）──
 //

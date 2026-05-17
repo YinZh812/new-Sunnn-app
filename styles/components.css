@@ -358,8 +358,9 @@ body{font-family:var(--font-app);color:var(--t1);-webkit-font-smoothing:antialia
 .lucide-picker-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:6px 0;max-height:50vh;overflow-y:auto}
 .lp-group-label{grid-column:1/-1;font-size:12px;font-weight:600;color:var(--t2);padding:6px 2px 2px;margin-top:4px}
 .lp-group-label:first-child{margin-top:0;padding-top:0}
-.lp-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:var(--card-alt);border-radius:10px;cursor:pointer;color:var(--t1);transition:background .15s}
+.lp-cell{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 2px 4px;background:var(--card-alt);border-radius:10px;cursor:pointer;color:var(--t1);transition:background .15s}
 .lp-cell:active{background:var(--bdr)}
+.lp-name{font-size:9px;color:var(--t3);line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .adv-color-list{padding:6px 14px 14px}
 .color-row{display:flex;align-items:center;justify-content:space-between;padding:10px 4px;border-bottom:1px solid var(--bdr2)}
 .color-row:last-child{border-bottom:none}
@@ -445,8 +446,6 @@ body{font-family:var(--font-app);color:var(--t1);-webkit-font-smoothing:antialia
 .overlay[style*="display: flex"] .sheet,.overlay[style*="display:flex"] .sheet{animation:sheetSlideUp .28s cubic-bezier(.32,.72,0,1)}
 @keyframes sheetSlideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .sheet-flush{padding:0!important;padding-bottom:0!important}
-.hdl{width:40px;height:4px;background:var(--div);border-radius:2px;margin:0 auto 14px;cursor:grab}
-.hdl-invisible{width:60px;height:18px;background:transparent;margin:0 auto;cursor:grab;flex-shrink:0}
 .slbl{font-size:11px;font-weight:500;color:var(--t2);letter-spacing:1.5px;text-transform:uppercase;text-align:center;margin-bottom:14px}
 .samt{font-size:38px;font-weight:700;text-align:center;letter-spacing:-1.4px;margin-bottom:4px;font-family:var(--font-digit);color:var(--t1)}
 .snote{font-size:11px;color:var(--t2);text-align:center;margin-bottom:12px;background:var(--card-alt);padding:5px 12px;border-radius:20px;display:inline-block;width:100%}

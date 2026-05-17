@@ -6,7 +6,10 @@ import { byId } from "../../utils/dom.js";
 import { store } from "../../state/store.js";
 import { getCategoryIcon } from "../../domain/categories.js";
 import { lucideSvg } from "../../utils/icons.js";
+import { currencySymbol } from "../../utils/format.js";
 import { fxTap, fxDelete, fxError } from "../components/sfx.js";
+
+const CUR_NAME_MAP = { EUR: "欧元", CNY: "人民币", USD: "美元", GBP: "英镑", JPY: "日元" };
 
 // ── 模块状态 ────────────────────────────────────────────────────────────────
 
@@ -54,15 +57,20 @@ export function render() {
 
   const spendCats = getBudgetCatList();
 
+  const s = store.getSettings();
+  const defCur = s.defaultCurrency || "EUR";
+  const defSym = currencySymbol(defCur);
+  const defCurName = CUR_NAME_MAP[defCur] || defCur;
+
   // 预算行
   let bRows = spendCats.map((c) => {
     const ico = getCategoryIcon(c, customByType, { size: 22, strokeWidth: 1.6 });
     return '<div class="bsr">' +
       '<div class="bsr-ico">' + ico + '</div>' +
       '<div class="bsr-name">' + c + '</div>' +
-      '<div class="bsr-cur">€</div>' +
+      '<div class="bsr-cur">' + defSym + '</div>' +
       '<input type="number" class="set-input" placeholder="不限" value="' +
-        (budgets[c] || "") + '" data-c="' + c + '" oninput="setBudget(this)">' +
+        (budgets[c] || "") + '" data-c="' + c + '" onchange="setBudget(this)">' +
     '</div>';
   }).join("");
 
@@ -76,7 +84,7 @@ export function render() {
       : "全部历史";
     return '<div class="bsr" style="flex-wrap:wrap">' +
       '<div class="bsr-name">🏦 ' + g.name + '</div>' +
-      '<div class="bsr-cur">目标 €' + g.target + '</div>' +
+      '<div class="bsr-cur">目标 ' + defSym + g.target + '</div>' +
       '<div style="cursor:pointer;color:var(--expense);font-size:12px;padding:0 8px" onclick="deleteGoal(' + i + ')">删除</div>' +
       '<div style="width:100%;font-size:10px;color:var(--t3);padding:0 14px 4px">' + startLbl + '</div>' +
     '</div>';
@@ -93,7 +101,7 @@ export function render() {
   const sEl = byId("goals-savings-section");
 
   if (bEl) {
-    bEl.innerHTML = '<div class="set-card"><div class="set-title">月度预算（欧元）</div>' + bRows + '</div>';
+    bEl.innerHTML = '<div class="set-card"><div class="set-title">月度预算（' + defCurName + '）</div>' + bRows + '</div>';
   }
 
   if (sEl) {
@@ -101,7 +109,7 @@ export function render() {
       (goalList || '<div style="padding:10px 14px;font-size:12px;color:var(--t3)">还没有目标，添加一个吧</div>') +
       '<div class="goal-form">' +
         '<input type="text" id="goalName" placeholder="目标名称（如：买车、旅游）">' +
-        '<input type="number" id="goalAmt" placeholder="目标金额（欧元）" step="100">' +
+        '<input type="number" id="goalAmt" placeholder="目标金额（' + defCurName + '）" step="100">' +
         '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2)">' +
           '<span>起始日期</span>' +
           '<input type="date" id="goalStartDate" style="flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--bdr);border-radius:6px;background:var(--card);color:var(--t1)"' +

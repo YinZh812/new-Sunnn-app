@@ -297,7 +297,12 @@ export function render() {
     '</div>' +
 
     // ── 我的个人词典卡（v2 阶段 6.3）──
-    renderLearnedRulesCard();
+    renderLearnedRulesCard() +
+
+    // ── 重置应用 ──
+    '<div class="set-card" style="margin-top:24px;border:1px solid var(--expense);background:transparent">' +
+      '<div class="action-btn" style="background:var(--expense);color:#fff" onclick="resetApp()">重置应用（清除全部数据）</div>' +
+    '</div>';
 
   // 绑定隐藏的色相滑块
   bindHueSlider("hueSlider", "hueThumb",
@@ -860,7 +865,13 @@ export function openColorPicker(varName, anchor) {
   document.getElementById("cppHueThumb").style.left = (_cppCurHue / 360 * 100) + "%";
   document.getElementById("cppHueThumb").style.background = cur;
   document.getElementById("cppLitThumb").style.left = _cppCurLit + "%";
-  document.getElementById("cppHex").textContent = cur.toUpperCase();
+  const hexEl = document.getElementById("cppHex");
+  hexEl.textContent = cur.toUpperCase();
+  if (!hexEl._clickBound) {
+    hexEl._clickBound = true;
+    hexEl.style.cursor = "pointer";
+    hexEl.addEventListener("click", editHexDirect);
+  }
   p.classList.add("open");
   const bd = document.getElementById("colorPickerBackdrop");
   if (bd) bd.classList.add("open");
@@ -979,6 +990,26 @@ export function closeColorPicker() {
   _cppCurVar = null;
 }
 
+function editHexDirect() {
+  const hexEl = document.getElementById("cppHex");
+  if (!hexEl || !_cppCurVar) return;
+  const cur = hexEl.textContent.trim();
+  const v = prompt("输入 HEX 颜色值", cur);
+  if (!v) return;
+  const hex = v.startsWith("#") ? v : "#" + v;
+  if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+    if (typeof window.showToast === "function") window.showToast("无效的颜色值");
+    return;
+  }
+  const hsl = hexToHsl(hex);
+  _cppCurHue = hsl.h;
+  _cppCurLit = hsl.l;
+  applyCppLive();
+  saveAndRefreshCpp();
+  document.getElementById("cppHueThumb").style.left = (_cppCurHue / 360 * 100) + "%";
+  document.getElementById("cppLitThumb").style.left = _cppCurLit + "%";
+}
+
 // ── 高级主题面板 ────────────────────────────────────────────────────────────
 
 export function openThemeAdvanced() {
@@ -1052,7 +1083,10 @@ export function closeCatSettings() {
 export function renderCatSettings() {
   const list = document.getElementById("catSettingsList");
   list.innerHTML = "";
-  const cats = window.customCategories || [];
+  const byType = store.getCustomCategoriesByType();
+  const cats = byType.expense || [];
+  window.customCategoriesByType = byType;
+  window.customCategories = cats;
   cats.forEach(function (c, i) {
     const r = document.createElement("div");
     r.className = "cs-row";
@@ -1157,6 +1191,19 @@ export function editCatIcon(i) {
   );
 }
 
+const ICON_CN = {
+  utensils:"餐具",coffee:"咖啡",wine:"红酒","glass-water":"水杯",
+  "shopping-bag":"购物袋","shopping-cart":"购物车",store:"商店",shirt:"衣服",tag:"标签",scissors:"剪刀",gem:"珠宝",
+  car:"汽车",bus:"巴士",bike:"自行车",plane:"飞机",fuel:"加油","map-pin":"定位",
+  "tennis-ball":"网球",dumbbell:"哑铃",trophy:"奖杯",award:"奖牌",flame:"火焰",
+  film:"电影",music:"音乐","gamepad-2":"游戏",camera:"相机",tv:"电视",headphones:"耳机",
+  home:"房子",landmark:"银行",lightbulb:"灯泡",wrench:"工具",umbrella:"雨伞",cloud:"云",
+  briefcase:"公文包",laptop:"电脑",smartphone:"手机",mail:"邮件",calculator:"计算器",pencil:"铅笔",book:"书本","book-open":"翻书","graduation-cap":"学士帽",
+  "heart-pulse":"心跳",pill:"药物",shield:"盾牌",
+  wallet:"钱包","piggy-bank":"存钱罐","credit-card":"信用卡",banknote:"钞票",receipt:"收据","trending-up":"趋势",
+  star:"星星",heart:"爱心",smile:"笑脸",sun:"太阳",moon:"月亮",zap:"闪电",clock:"时钟",calendar:"日历",flag:"旗帜",gift:"礼物",phone:"电话",ticket:"票券",package:"包裹",target:"靶心",
+};
+
 export function openLucidePicker(onPick, onEmoji) {
   const ov = document.getElementById("ov-lucide-picker");
   if (!ov) return;
@@ -1170,8 +1217,8 @@ export function openLucidePicker(onPick, onEmoji) {
     g.icons.forEach(function (n) {
       const c = document.createElement("div");
       c.className = "lp-cell";
-      c.innerHTML = lucideSvg(n, 24, 1.6);
-      c.title = n;
+      c.innerHTML = lucideSvg(n, 24, 1.6) + '<div class="lp-name">' + (ICON_CN[n] || n) + '</div>';
+      c.title = (ICON_CN[n] || n) + " (" + n + ")";
       c.onclick = function () { closeLucidePicker(); onPick(n); };
       grid.appendChild(c);
     });
@@ -1201,7 +1248,7 @@ export function deleteCat(i) {
 }
 
 export function addNewCat() {
-  window.customCategories.push({ name: "新类别", icon: "📦" });
+  window.customCategories.push({ name: "新类别", icon: "lucide:package" });
   if (typeof window.saveCustomCategories === "function") window.saveCustomCategories();
   renderCatSettings();
   const list = document.getElementById("catSettingsList");
@@ -1442,6 +1489,18 @@ export function handleClearLearnedRules() {
   if (!confirm("确认清空全部 " + count + " 条学习规则？此操作不可撤销。")) return;
   store.clearLearnedRules();
   _toast("已清空");
+}
+
+export function resetApp() {
+  if (!confirm("确认重置应用？所有交易记录、设置和学习规则都将被清除。")) return;
+  if (!confirm("再次确认：此操作不可恢复，您的所有数据将永久删除。")) return;
+  const code = prompt("最后确认：请输入 RESET 来执行重置");
+  if (code !== "RESET") {
+    _toast("已取消重置");
+    return;
+  }
+  try { localStorage.clear(); } catch (e) {}
+  location.reload();
 }
 
 // ── 导出给外部使用的颜色帮手 ────────────────────────────────────────────────
