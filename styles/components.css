@@ -317,6 +317,8 @@ body{font-family:var(--font-app);color:var(--t1);-webkit-font-smoothing:antialia
 .bsr{display:flex;align-items:center;padding:11px 16px;border-bottom:0.5px solid var(--bdr)}
 .bsr:last-child{border-bottom:none}
 .bsr-ico{font-size:14px;margin-right:8px;display:flex;align-items:center;justify-content:center;width:24px;height:24px;color:var(--t1)}
+.goal-ico-edit{cursor:pointer;-webkit-tap-highlight-color:transparent;border-radius:6px;transition:background .15s}
+.goal-ico-edit:active{background:var(--bdr2)}
 .bsr-name{font-size:13px;font-weight:400;color:var(--t1);flex:1}
 .bsr-cur{font-size:11px;color:var(--t3);margin-right:4px}
 .bsr-del{margin-left:6px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%;color:var(--t3);font-size:11px;cursor:pointer;flex-shrink:0;background:var(--bdr2)}

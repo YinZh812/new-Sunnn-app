@@ -4,10 +4,11 @@
 
 import { byId } from "../../utils/dom.js";
 import { store } from "../../state/store.js";
-import { getCategoryIcon } from "../../domain/categories.js";
-import { lucideSvg } from "../../utils/icons.js";
+import { getCategoryIcon, DEFAULT_CATS_BY_TYPE } from "../../domain/categories.js";
+import { lucideSvg, renderIcon } from "../../utils/icons.js";
 import { currencySymbol } from "../../utils/format.js";
 import { fxTap, fxDelete, fxError } from "../components/sfx.js";
+import { openOverlay, closeOverlay } from "../components/overlay.js";
 
 const CUR_NAME_MAP = { EUR: "欧元", CNY: "人民币", USD: "美元", GBP: "英镑", JPY: "日元" };
 
@@ -23,6 +24,7 @@ export function init({ toast } = {}) {
   store.on("budgets:changed",  maybeRefresh);
   store.on("txs:changed",      maybeRefresh);
   store.on("settings:changed", maybeRefresh);
+  store.on("cats:changed",     maybeRefresh);
 }
 
 export function onShow() { render(); }
@@ -37,14 +39,14 @@ function maybeRefresh() {
 export function getBudgetCatList() {
   const s = store.getSettings();
   if (s.budgetCatOrder && s.budgetCatOrder.length) return s.budgetCatOrder.slice();
-  const defaultSpend = ["餐饮", "超市", "购物", "交通", "娱乐", "生活", "医疗", "其他"];
   const customByType = store.getCustomCategoriesByType();
-  const customSpend = (customByType.expense || []).map((c) => c.name);
+  const expCats = (customByType.expense && customByType.expense.length)
+    ? customByType.expense : DEFAULT_CATS_BY_TYPE.expense;
   const hasBudget = Object.keys(store.getBudgets());
-  const allCats = defaultSpend.concat(customSpend).concat(hasBudget);
   const seen = {};
   const out = [];
-  allCats.forEach((c) => { if (c && !seen[c]) { seen[c] = 1; out.push(c); } });
+  expCats.forEach((c) => { if (c.name && !seen[c.name]) { seen[c.name] = 1; out.push(c.name); } });
+  hasBudget.forEach((c) => { if (c && !seen[c]) { seen[c] = 1; out.push(c); } });
   return out;
 }
 
@@ -82,8 +84,10 @@ export function render() {
     const startLbl = g.startDate
       ? new Date(g.startDate).toLocaleDateString("zh-CN", { year: "numeric", month: "short", day: "numeric" }) + " 起"
       : "全部历史";
+    const ico = g.icon ? renderIcon(g.icon, 22, 1.6) : "🏦";
     return '<div class="bsr" style="flex-wrap:wrap">' +
-      '<div class="bsr-name">🏦 ' + g.name + '</div>' +
+      '<div class="bsr-ico goal-ico-edit" onclick="editGoalIcon(' + i + ')" title="点击换图标">' + ico + '</div>' +
+      '<div class="bsr-name">' + g.name + '</div>' +
       '<div class="bsr-cur">目标 ' + defSym + g.target + '</div>' +
       '<div style="cursor:pointer;color:var(--expense);font-size:12px;padding:0 8px" onclick="deleteGoal(' + i + ')">删除</div>' +
       '<div style="width:100%;font-size:10px;color:var(--t3);padding:0 14px 4px">' + startLbl + '</div>' +
@@ -165,52 +169,29 @@ export function deleteGoal(i) {
 
 // ── 预算类别编辑器 ──────────────────────────────────────────────────────────
 
-export function addBudgetCat() {
-  const name = (prompt("新类别名称：") || "").trim();
-  if (!name) return;
-  if (window.budgets[name] !== undefined) {
-    if (typeof window.showToast === "function") window.showToast("该类别已存在");
-    return;
-  }
-  window.budgets[name] = 0;
-  if (typeof window.saveBudgets === "function") window.saveBudgets();
-  render();
-  if (typeof window.fxTap === "function") window.fxTap();
-}
-
-export function deleteBudgetCat(c) {
-  if (!confirm("删除「" + c + "」预算？")) return;
-  delete window.budgets[c];
-  if (window.settings.budgetCatOrder) {
-    window.settings.budgetCatOrder = window.settings.budgetCatOrder.filter((x) => x !== c);
-    if (typeof window.saveSettings === "function") window.saveSettings();
-  }
-  if (typeof window.saveBudgets === "function") window.saveBudgets();
-  render();
-  if (typeof window.fxDelete === "function") window.fxDelete();
-  if (typeof window.showToast === "function") window.showToast("已删除");
-}
-
 export function openBudgetCatEditor() {
-  if (typeof window.fxOpen === "function") window.fxOpen();
-  const list = (typeof window.getBudgetCatList === "function" ? window.getBudgetCatList() : []);
-  if (!window.settings.budgetCatOrder) window.settings.budgetCatOrder = list.slice();
-  document.getElementById("ov-bcat-edit").style.display = "flex";
+  fxTap();
+  const s = store.getSettings();
+  if (!s.budgetCatOrder) {
+    s.budgetCatOrder = getBudgetCatList();
+    store.setSettings(s);
+  }
+  openOverlay("ov-bcat-edit");
   renderBudgetCatEditor();
 }
 
 export function closeBudgetCatEditor() {
-  if (typeof window.saveSettings === "function") window.saveSettings();
   render();
-  document.getElementById("ov-bcat-edit").style.display = "none";
-  if (typeof window.fxClose === "function") window.fxClose();
+  closeOverlay("ov-bcat-edit");
 }
 
 export function renderBudgetCatEditor() {
   const listEl = document.getElementById("bcatEditList");
   if (!listEl) return;
   listEl.innerHTML = "";
-  const order = window.settings.budgetCatOrder || [];
+  const s = store.getSettings();
+  const order = s.budgetCatOrder || [];
+  const customByType = store.getCustomCategoriesByType();
   order.forEach(function (c, i) {
     const r = document.createElement("div");
     r.className = "bcat-row";
@@ -218,7 +199,7 @@ export function renderBudgetCatEditor() {
     r.setAttribute("draggable", "true");
     const ico = document.createElement("div");
     ico.className = "bcat-row-ico";
-    ico.innerHTML = (typeof window.getCatIcon === "function" ? window.getCatIcon(c) : "") || (window.CAT_ICO && window.CAT_ICO[c]) || "📦";
+    ico.innerHTML = getCategoryIcon(c, customByType, { size: 20, strokeWidth: 1.6 });
     const nm = document.createElement("div");
     nm.className = "bcat-row-name";
     nm.textContent = c;
@@ -229,12 +210,14 @@ export function renderBudgetCatEditor() {
     del.onclick = function (e) {
       e.stopPropagation();
       if (!confirm("删除「" + c + "」预算？")) return;
-      delete window.budgets[c];
-      window.settings.budgetCatOrder.splice(i, 1);
-      if (typeof window.saveBudgets === "function") window.saveBudgets();
-      if (typeof window.saveSettings === "function") window.saveSettings();
+      const budgets = { ...store.getBudgets() };
+      delete budgets[c];
+      store.setBudgets(budgets);
+      const ss = store.getSettings();
+      ss.budgetCatOrder.splice(i, 1);
+      store.setSettings(ss);
       renderBudgetCatEditor();
-      if (typeof window.fxDelete === "function") window.fxDelete();
+      fxDelete();
     };
     const drag = document.createElement("div");
     drag.className = "bcat-row-drag";
@@ -254,10 +237,11 @@ export function renderBudgetCatEditor() {
       const src = parseInt(e.dataTransfer.getData("text/plain"));
       const dst = i;
       if (src === dst || isNaN(src)) return;
-      const arr = window.settings.budgetCatOrder;
+      const ss = store.getSettings();
+      const arr = ss.budgetCatOrder;
       const moved = arr.splice(src, 1)[0];
       arr.splice(dst, 0, moved);
-      if (typeof window.saveSettings === "function") window.saveSettings();
+      store.setSettings(ss);
       renderBudgetCatEditor();
     });
     drag.addEventListener("touchstart", function (e) {
@@ -272,10 +256,11 @@ export function renderBudgetCatEditor() {
       if (!el || el === r) return;
       const ti = parseInt(el.getAttribute("data-i"));
       if (isNaN(ti)) return;
-      const arr = window.settings.budgetCatOrder;
+      const ss = store.getSettings();
+      const arr = ss.budgetCatOrder;
       const moved = arr.splice(i, 1)[0];
       arr.splice(ti, 0, moved);
-      if (typeof window.saveSettings === "function") window.saveSettings();
+      store.setSettings(ss);
       renderBudgetCatEditor();
     }, { passive: false });
     drag.addEventListener("touchend", function () { r.classList.remove("dragging"); });
@@ -289,15 +274,60 @@ export function renderBudgetCatEditor() {
 export function addBudgetCatNew() {
   const name = (prompt("新类别名称：") || "").trim();
   if (!name) return;
-  if (!window.settings.budgetCatOrder) {
-    window.settings.budgetCatOrder = (typeof window.getBudgetCatList === "function" ? window.getBudgetCatList() : []);
-  }
-  if (window.settings.budgetCatOrder.indexOf(name) >= 0) {
-    if (typeof window.showToast === "function") window.showToast("已存在");
+  const s = store.getSettings();
+  if (!s.budgetCatOrder) s.budgetCatOrder = getBudgetCatList();
+  if (s.budgetCatOrder.indexOf(name) >= 0) {
+    _toast("已存在");
     return;
   }
-  window.settings.budgetCatOrder.push(name);
-  if (typeof window.saveSettings === "function") window.saveSettings();
+  s.budgetCatOrder.push(name);
+  store.setSettings(s);
   renderBudgetCatEditor();
-  if (typeof window.fxTap === "function") window.fxTap();
+  fxTap();
+}
+
+// ── 目标图标编辑 ──────────────────────────────────────────────────────────────
+
+const GOAL_ICONS = [
+  "piggy-bank", "wallet", "landmark", "banknote", "coins",
+  "home", "car", "plane", "palmtree", "ship",
+  "graduation-cap", "heart-pulse", "baby", "gift", "camera",
+  "laptop", "smartphone", "tv", "music", "book-open",
+  "dumbbell", "trophy", "star", "diamond", "target",
+];
+
+export function editGoalIcon(idx) {
+  const goals = store.getGoals();
+  const g = goals[idx];
+  if (!g) return;
+  const ov = document.getElementById("ov-goal-icon");
+  if (!ov) return;
+  const grid = document.getElementById("goalIconGrid");
+  grid.innerHTML = "";
+  GOAL_ICONS.forEach((n) => {
+    const c = document.createElement("div");
+    c.className = "lp-cell";
+    c.innerHTML = lucideSvg(n, 24, 1.6);
+    c.onclick = () => {
+      g.icon = "lucide:" + n;
+      store.setGoals(goals.slice());
+      closeOverlay("ov-goal-icon");
+      render();
+      fxTap();
+    };
+    grid.appendChild(c);
+  });
+  const emoBtn = document.getElementById("goalIconEmojiBtn");
+  if (emoBtn) {
+    emoBtn.onclick = () => {
+      const v = prompt("输入 Emoji");
+      if (!v) return;
+      g.icon = v.trim();
+      store.setGoals(goals.slice());
+      closeOverlay("ov-goal-icon");
+      render();
+      fxTap();
+    };
+  }
+  openOverlay("ov-goal-icon");
 }

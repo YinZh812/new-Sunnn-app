@@ -384,10 +384,9 @@ window.renderGoals     = goalsTab.render;
 window.setBudget       = goalsTab.setBudget;
 window.addGoal         = goalsTab.addGoal;
 window.deleteGoal      = goalsTab.deleteGoal;
+window.editGoalIcon    = goalsTab.editGoalIcon;
 window.getBudgetCatList = goalsTab.getBudgetCatList;
 // 预算类别编辑器
-window.addBudgetCat         = goalsTab.addBudgetCat;
-window.deleteBudgetCat      = goalsTab.deleteBudgetCat;
 window.openBudgetCatEditor  = goalsTab.openBudgetCatEditor;
 window.closeBudgetCatEditor = goalsTab.closeBudgetCatEditor;
 window.renderBudgetCatEditor = goalsTab.renderBudgetCatEditor;
