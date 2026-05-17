@@ -14,11 +14,20 @@ import {
   sendPasswordResetEmail, updatePassword,
   getCurrentUser, isSupabaseReady, onAuthChange,
 } from "../../state/auth.js";
-import { manualSync } from "../../state/sync.js";
+import { manualSync, onSyncStatus } from "../../state/sync.js";
+import { store } from "../../state/store.js";
 
 const OVERLAY_ID = "ov-auth";
 
 let _toastFn = (msg) => console.log("[toast]", msg);
+
+// 同步状态 → 中文文案
+const SYNC_STATUS_LABEL = {
+  idle:    "空闲",
+  syncing: "进行中…",
+  synced:  "已同步",
+  error:   "失败",
+};
 
 export function init(deps = {}) {
   if (deps.toast) _toastFn = deps.toast;
@@ -37,7 +46,15 @@ export function init(deps = {}) {
     }
   });
 
-  // TODO: 绑定弹窗内的 button onClick 到本模块的 doSignIn / doSignUp / doSignOut 等
+  // 同步状态变化 → 已登录态卡片里的"同步状态"文字实时刷新
+  onSyncStatus((status) => {
+    const el = byId("auth-sync-status");
+    if (!el) return;
+    el.textContent = "同步状态：" + (SYNC_STATUS_LABEL[status] || status);
+  });
+
+  // 弹窗内按钮的 onclick 通过 index.html 的 inline `onclick="doSignIn()"` +
+  // main.js 里 `window.doSignIn = authModal.doSignIn` 的桥接完成，本模块不再手动绑定。
 }
 
 /**
@@ -46,7 +63,7 @@ export function init(deps = {}) {
  */
 export function open(opts = {}) {
   if (!isSupabaseReady()) {
-    _toastFn("云端未配置，请先在源码顶部填入 Supabase URL 和 Key");
+    _toastFn("云端连接异常，请检查网络或稍后重试");
   }
   const mode = opts.mode || (getCurrentUser() ? "signed-in" : "signed-out");
 
@@ -118,9 +135,32 @@ export async function doSignInWithGoogle() {
 }
 
 export async function doSignOut() {
+  // 询问是否同时清除本地账本数据
+  //   确定 → 退出 + 清本地（共享设备友好）
+  //   取消 → 仅退出 session，本地数据保留（下次登录会与云端合并）
+  const clearLocal = window.confirm(
+    "是否同时清除本设备上的本地账本数据？\n\n" +
+    "• 确定：清空本地（适合共享设备）\n" +
+    "• 取消：仅退出登录，下次登录后会与云端数据合并"
+  );
+
   try { await signOut(); } catch {}
+
+  if (clearLocal) {
+    // 重置数据层（保留 settings 中的主题等纯偏好）
+    store.setTxs([]);
+    store.setBudgets({});
+    store.setGoals([]);
+    store.setDeletedSugs([]);
+    store.clearLearnedRules();
+    // 自定义类别也清，回到默认
+    store.setCustomCategoriesByType({});
+    _toastFn("已退出登录，本地数据已清除");
+  } else {
+    _toastFn("已退出登录");
+  }
+
   close();
-  _toastFn("已退出登录");
 }
 
 export async function doForgotPassword() {
