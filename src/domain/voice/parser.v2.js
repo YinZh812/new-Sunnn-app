@@ -460,6 +460,16 @@ export function voiceRemapCategoryByType(text, type) {
   if (/打车|出租车|uber|taxi|滴滴|地铁|公交|公交车|火车|高铁|动车|飞机|机票|加油|油费|汽油|gasoline|petrol|停车|停车场|停车费|高速|过路费|过桥费|etc|维修|保养|换胎|机油|洗车|车票|汽车|租车|car ?rental|过户|车险|driving|驾驶/i.test(text)) return "交通";
   if (/健身|瑜伽|游泳|羽毛球|网球|篮球|足球|乒乓球|跑步|骑行|滑雪|滑冰|球拍|球鞋|台球|桌球|斯诺克|球线|私教|健身房|gym|yoga|fitness|sport|workout|训练课|跑鞋|攀岩|拳击|马拉松/i.test(text)) return "运动";
 
+  // 动词优先于名词（用户反馈）：
+  //   "在商场吃东西" → 餐饮（吃 动词 胜过 商场 名词）
+  //   "超市买牛奶面包" → 购物（买 动词 胜过 牛奶/面包 名词）
+  //
+  //   餐饮强动词（吃/喝 含义无歧义）优先级最高；购物动词次之；最后才到名词逐字典。
+  //   注：餐饮动词若与"买单"这种 餐饮场景但用了"买"字 的边界冲突，目前以餐饮动词
+  //       优先；纯"买单 300" 这种没有 吃/喝 的，仍会判 购物，依赖用户的学习规则纠正。
+  if (/吃|喝|用餐|进餐|eat|drink|dine|brunch/i.test(text)) return "餐饮";
+  if (/买|购|网购|下单|shopping/i.test(text)) return "购物";
+
   for (const kw of (VOICE_CAT_MAP["吃"] || [])) {
     if (lower.includes(kw.toLowerCase())) return "餐饮";
   }

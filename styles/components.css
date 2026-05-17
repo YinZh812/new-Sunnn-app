@@ -515,12 +515,12 @@ body{font-family:var(--font-app);color:var(--t1);-webkit-font-smoothing:antialia
 .manual-cur-toggle{position:absolute;left:10px;top:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:var(--card-alt);border:1px solid var(--bdr);border-radius:50%;color:var(--t1);font-size:15px;font-weight:600;cursor:pointer;user-select:none;line-height:1;font-family:var(--font-digit);padding:0}
 .manual-cur-toggle:active{opacity:.6}
 
-/* 手动记账：时段选择 chip 行（现在/早上/上午/中午/下午/傍晚/晚上/半夜/凌晨） */
-.period-row{display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto;padding:2px 14px 6px;scrollbar-width:none}
-.period-row::-webkit-scrollbar{display:none}
-.period-chip{flex:0 0 auto;background:var(--card-alt);color:var(--t2);border:1px solid var(--bdr);border-radius:14px;padding:3px 9px;font-size:10.5px;font-weight:400;cursor:pointer;user-select:none;white-space:nowrap;transition:background .12s,color .12s,border-color .12s}
-.period-chip.active{background:var(--acc);color:#fff;border-color:var(--acc)}
-.period-chip:active{opacity:.7}
+/* 手动记账：mcb-date 单元格拆成上下两半（上=日期 / 下=时间滚轮） */
+.mc-calc .mcb.mcb-date{padding:0;gap:0;flex-direction:column}
+.mc-calc .mcb.mcb-date .mdt-half{flex:1;width:100%;display:flex;align-items:center;justify-content:center;gap:3px;font-size:10px;line-height:1.05;position:relative;cursor:pointer;padding:0 2px}
+.mc-calc .mcb.mcb-date .mdt-half:first-child{border-bottom:1px solid var(--bdr)}
+.mc-calc .mcb.mcb-date .mdt-half:active{filter:brightness(.92)}
+.mc-calc .mcb.mcb-date .mdt-half .mdb-emo{font-size:11px}
 
 /* 设置页 货币与汇率卡：每个币种独占一行的开关行
  * 用 .set-row 同样的 padding/border-bottom 节奏，保持卡内视觉一致。 */
