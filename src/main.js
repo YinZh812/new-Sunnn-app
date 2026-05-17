@@ -418,6 +418,7 @@ window.selCur             = manualModal.selCur;
 window.mcInput            = manualModal.mcInput;
 window.mcDone             = manualModal.mcDone;
 window.mcDateChange       = manualModal.mcDateChange;
+window.selectPeriod       = manualModal.selectPeriod;
 window.saveDraft          = manualModal.saveDraft;
 window.restoreDraft       = manualModal.restoreDraft;
 window.buildManualCatRow  = manualModal.buildManualCatRow;

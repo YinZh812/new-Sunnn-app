@@ -25,6 +25,14 @@ let editIdx = -1;
 let mType = "expense";
 let mCur  = "EUR";
 let mCat  = "其他";
+// 时段：null 或 8 个时段词之一。null = 用当前实时时间（默认）。
+let mcPeriod = null;
+
+// 时段词 → 该时段默认时刻（与 voice/dictionary.v2.js TIME_PERIOD 保持一致）
+const PERIOD_HOURS = {
+  "早上": [8, 0],  "上午": [9, 0],  "中午": [12, 0], "下午": [14, 0],
+  "傍晚": [17, 0], "晚上": [20, 0], "半夜": [23, 0], "凌晨": [1, 0],
+};
 
 // 计算器状态
 let mcAmt = "", mcHasDot = false, mcDecCount = 0, mcOp = null, mcPrev = null, mcDate = null;
@@ -98,6 +106,9 @@ export function open(idx = -1) {
   // 计算器状态
   mcOp = null; mcPrev = null;
   mcDate = isEdit ? t.ts : null;
+  // 时段：编辑模式下从 tx.timePhrase 读回；新建则为 null
+  mcPeriod = (isEdit && t && t.timePhrase && PERIOD_HOURS[t.timePhrase]) ? t.timePhrase : null;
+  syncPeriodRow();
   if (t && t.amount) {
     mcSetFromAmount(t.amount);
   } else {
@@ -401,6 +412,31 @@ export function mcDateChange(v) {
   updateMcDateBtn();
 }
 
+// ── 时段选择 ────────────────────────────────────────────────────────────────
+
+/**
+ * 选择时段。空串 = 清除（回到"现在"），其他必须是 PERIOD_HOURS 的 key。
+ * inline onclick 桥接通过 window.selectPeriod。
+ */
+export function selectPeriod(word) {
+  fxTap();
+  if (!word || !PERIOD_HOURS[word]) {
+    mcPeriod = null;
+  } else {
+    mcPeriod = word;
+  }
+  syncPeriodRow();
+}
+
+function syncPeriodRow() {
+  const row = byId("mcPeriodRow");
+  if (!row) return;
+  const want = mcPeriod || "";  // "" = "现在"
+  qsa("#mcPeriodRow .period-chip").forEach((c) => {
+    c.classList.toggle("active", c.getAttribute("data-p") === want);
+  });
+}
+
 // ── 推荐词 ──────────────────────────────────────────────────────────────────
 
 export function showManualSug() {
@@ -467,7 +503,7 @@ export function saveDraft() {
     amt: (byId("mamt") || {}).value || "",
     date: (byId("mdate") || {}).value || "",
     editIdx,
-    mcAmt, mcHasDot, mcDecCount, mcOp, mcPrev, mcDate,
+    mcAmt, mcHasDot, mcDecCount, mcOp, mcPrev, mcDate, mcPeriod,
   };
 }
 
@@ -492,6 +528,7 @@ export function restoreDraft() {
   mcOp       = manualDraft.mcOp || null;
   mcPrev     = manualDraft.mcPrev || null;
   mcDate     = manualDraft.mcDate || null;
+  mcPeriod   = manualDraft.mcPeriod && PERIOD_HOURS[manualDraft.mcPeriod] ? manualDraft.mcPeriod : null;
 
   syncTypeTabs();
   syncCurToggle();
@@ -501,6 +538,7 @@ export function restoreDraft() {
   buildManualCatRow();
   updateMcDisplay();
   updateMcDateBtn();
+  syncPeriodRow();
   manualDraft = null;
 }
 
@@ -508,7 +546,9 @@ export function clearAndClose() {
   fxClose();
   manualDraft = null;
   mcAmt = ""; mcHasDot = false; mcDecCount = 0; mcOp = null; mcPrev = null; mcDate = null;
+  mcPeriod = null;
   updateMcDateBtn();
+  syncPeriodRow();
   updateMcDisplay();
   const di = byId("mcDescInp"); if (di) di.value = "";
   const ai = byId("mamt"); if (ai) ai.value = "";
@@ -532,13 +572,39 @@ export function submitManual() {
   const desc = (descRaw || "").trim() || mCat;
   const dateVal = (byId("mdate") || {}).value;
   const now = new Date();
-  const ts = dateVal
-    ? new Date(dateVal + "T" + pad2(now.getHours()) + ":" + pad2(now.getMinutes()) + ":00").getTime()
-    : now.getTime();
+
+  // 计算 ts + 精度 + 时段词
+  //   - 选了时段 → 把当日（或选定日期）的小时设成时段默认时刻；precision="daytime"
+  //   - 没选时段 + 选了非今天日期 → 用 12:00；precision="day"（之前用 now.getHours 是 bug）
+  //   - 没选时段 + 今天/未选日期 → 用当前实时时间；precision="exact"
+  let ts, timePrecision = "exact", timePhrase = "";
+  const isToday = (() => {
+    if (!dateVal) return true;
+    const d0 = new Date(dateVal + "T00:00:00");
+    return d0.getFullYear() === now.getFullYear() &&
+           d0.getMonth()    === now.getMonth() &&
+           d0.getDate()     === now.getDate();
+  })();
+  const baseDate = dateVal ? new Date(dateVal + "T00:00:00") : new Date(now);
+
+  if (mcPeriod && PERIOD_HOURS[mcPeriod]) {
+    const [h, m] = PERIOD_HOURS[mcPeriod];
+    baseDate.setHours(h, m, 0, 0);
+    ts = baseDate.getTime();
+    timePrecision = "daytime";
+    timePhrase = mcPeriod;
+  } else if (!isToday) {
+    baseDate.setHours(12, 0, 0, 0);
+    ts = baseDate.getTime();
+    timePrecision = "day";
+  } else {
+    ts = now.getTime();
+    timePrecision = "exact";
+  }
 
   const t = {
     amount: amt, currency: mCur, category: mCat, type: mType,
-    desc, ts, timeLabel: "", timePrecision: "exact",
+    desc, ts, timeLabel: "", timePrecision, timePhrase,
   };
 
   const txs = store.getTxs();
