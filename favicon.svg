@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <!-- 账本主体（薄荷绿圆角矩形）-->
-  <rect x="9" y="7" width="46" height="50" rx="5" fill="#A8DCC6"/>
-  <!-- 账本装订线（左侧深色竖条）-->
-  <rect x="13" y="7" width="2.5" height="50" fill="#7BB89A"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- 账本主体：铺满整个画布，避免 iOS 加黑边。iOS 会自动圆角 -->
+  <rect x="0" y="0" width="64" height="64" fill="#A8DCC6"/>
+  <!-- 装订线（左侧深色竖条）-->
+  <rect x="6" y="0" width="3" height="64" fill="#7BB89A"/>
   <!-- 美元符号 $（黄色，居中偏右）-->
-  <text x="37" y="44" font-family="Georgia, 'Times New Roman', serif" font-size="32" font-weight="700" fill="#F4C430" text-anchor="middle">$</text>
+  <text x="36" y="46" font-family="Georgia, 'Times New Roman', serif" font-size="40" font-weight="700" fill="#F4C430" text-anchor="middle">$</text>
 </svg>
