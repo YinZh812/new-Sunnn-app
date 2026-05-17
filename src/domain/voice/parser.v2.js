@@ -457,8 +457,8 @@ export function voiceRemapCategoryByType(text, type) {
 
   // expense
   // 注意：dict 里 BRAND_MAP / VOICE_CAT_MAP 仍用内部标签 "吃/玩/购物/其他"，这里只是把它们重映射成新 UI 名。
-  if (/打车|出租车|uber|taxi|滴滴|地铁|公交|公交车|火车|高铁|动车|飞机|机票|加油|油费|汽油|gasoline|petrol|停车|停车场|停车费|高速|过路费|过桥费|etc|维修|保养|换胎|机油|洗车|车票|汽车|租车|car ?rental|过户|车险|driving|驾驶/i.test(text)) return "交通";
-  if (/健身|瑜伽|游泳|羽毛球|网球|篮球|足球|乒乓球|跑步|骑行|滑雪|滑冰|球拍|球鞋|台球|桌球|斯诺克|球线|私教|健身房|gym|yoga|fitness|sport|workout|训练课|跑鞋|攀岩|拳击|马拉松/i.test(text)) return "运动";
+  if (/打车|出租车|出租|uber|taxi|lyft|滴滴|地铁|公交|公交车|火车|高铁|动车|飞机|机票|加油|油费|汽油|gasoline|petrol|加油站|停车|停车场|停车费|高速|过路费|过桥费|etc|维修|保养|换胎|机油|洗车|车票|汽车|租车|car ?rental|过户|车险|driving|驾驶|班车|校车|大巴|长途车|巴士|网约车|拼车|顺风车|共享单车|共享电动|共享电瓶|摩拜|哈罗|青桔|电动车|电瓶车|摩托车|船票|轮船|邮轮|渡轮|年检|检车|地铁卡|公交卡|一卡通/i.test(text)) return "交通";
+  if (/健身|瑜伽|游泳|羽毛球|网球|篮球|足球|乒乓球|排球|volleyball|棒球|baseball|橄榄球|rugby|高尔夫|golf|跑步|骑行|滑雪|滑冰|滑板|skateboard|跳绳|球拍|球鞋|台球|桌球|斯诺克|球线|私教|私教课|团操|健身房|健身卡|gym|yoga|fitness|sport|workout|训练课|跑鞋|攀岩|拳击|马拉松|武术|跆拳道|空手道|击剑|蹦极|蹦床|球场|游泳池|打球|踢球/i.test(text)) return "运动";
 
   // 动词优先于名词（用户反馈）：
   //   "在商场吃东西" → 餐饮（吃 动词 胜过 商场 名词）

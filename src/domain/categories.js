@@ -6,7 +6,7 @@
 //
 // 现役 UI 用新的；分析页/历史 CSV 导入仍可能见到旧的，所以两套都保留。
 
-export const CAT_DEFAULTS_VERSION = "2026-05-14-v3";
+export const CAT_DEFAULTS_VERSION = "2026-05-17-v4";
 
 /**
  * 按类型分组的默认类别。手动记账面板按 mType 选取这里的列表，
@@ -23,7 +23,7 @@ export const DEFAULT_CATS_BY_TYPE = {
     { name: "餐饮", icon: "lucide:utensils" },
     { name: "购物", icon: "lucide:shopping-bag" },
     { name: "交通", icon: "lucide:car" },
-    { name: "运动", icon: "lucide:dumbbell" },
+    { name: "运动", icon: "lucide:tennis-ball" },
     { name: "其他", icon: "lucide:package" },
   ],
   income: [
@@ -48,7 +48,7 @@ export const LEGACY_CAT_LIST = [
 /** 旧分类 → Lucide 图标名（含 v2→v3 重命名前的旧名兜底，确保历史 tx 仍能正确显示图标） */
 export const LEGACY_CAT_LUCIDE = {
   "餐饮":"utensils","超市":"store","购物":"shopping-bag","交通":"car",
-  "运动":"dumbbell","娱乐":"film","医疗":"heart-pulse","生活":"home",
+  "运动":"tennis-ball","娱乐":"film","医疗":"heart-pulse","生活":"home",
   "工资":"wallet","储蓄":"piggy-bank","彩票":"ticket","其他":"package",
   // v2 旧默认名（已被 v3 重命名替换；保留以兼容历史 tx / 用户旧 customCategories）
   "吃":"utensils","买":"shopping-bag","车":"car",
