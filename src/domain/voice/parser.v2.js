@@ -422,7 +422,6 @@ export function voiceSplitInput(text) {
   const dateM = parts[0].match(/^(今天|昨天|前天|[上本]周)/);
   const datePfx = dateM ? dateM[1] : "";
   if (datePfx) {
-    parts[0] = parts[0].slice(datePfx.length).trim();
     return parts.map((p, i) =>
       i > 0 && !/今天|昨天|前天/.test(p) ? datePfx + p : p
     );
@@ -549,13 +548,14 @@ export function parseVoiceText(text, options) {
   //   2. 保证 ts 严格递增，让"最后说的"显示在明细页最上方（列表按 ts 降序排）
   //   单笔（results.length<=1）不做这两步，避免回归单笔测试
   if (results.length > 1) {
-    const now = Date.now();
-    const today0 = new Date(); today0.setHours(0, 0, 0, 0);
-    const tomorrow0 = today0.getTime() + 86400000;
+    const now = new Date();
+    const nowH = now.getHours(), nowM = now.getMinutes(), nowS = now.getSeconds();
     for (const r of results) {
-      if (r.timePrecision === "day" && r.ts >= today0.getTime() && r.ts < tomorrow0) {
-        r.ts = now;
-        r.timePrecision = "exact";  // 改成精确，明细页显示具体时分
+      if (r.timePrecision === "day") {
+        const d = new Date(r.ts);
+        d.setHours(nowH, nowM, nowS, 0);
+        r.ts = d.getTime();
+        r.timePrecision = "exact";
       }
     }
     for (let i = 1; i < results.length; i++) {
