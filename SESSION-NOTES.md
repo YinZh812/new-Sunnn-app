@@ -4,9 +4,23 @@
 
 ---
 
+## ⚠️ Worktree 注意事项
+
+Claude Code 每次新开 session 默认在 `.claude/worktrees/<随机名>/` 下创建 git worktree 工作。
+**改动不会出现在主项目目录**，Cursor Live Server 看不到变化。
+
+**每轮 session 结束前必须把 worktree 分支合并回 master**：
+```bash
+cd "D:\编程 AI\记账app\3. 修改一句话解析规则"
+git merge claude/<worktree分支名> --no-edit
+```
+合并后 Cursor 刷新即可看到改动。
+
+---
+
 ## 一句话现状（2026-05-17）
 
-**架构重构 + 语音解析 v2 + 学习规则 + 多币种 + 多笔切分 + 动词优先词典 + 手动记账时间滚轮 + Google OAuth + 品牌图标** 全部完成并部署。
+**架构重构 + 语音解析 v2 + 学习规则 + 多币种 + 多笔切分 + 动词优先词典 + 手动记账时间滚轮 + Google OAuth + 品牌图标 + 去除储蓄类型 + Lucide 图标扩充** 全部完成并部署。
 
 - `index.html` ~520 行（入口 + ~160 行胶水 inline）
 - 36+ 个 JS 模块 ~8200 行，严格三层架构（utils → domain → state → ui）
@@ -25,7 +39,44 @@
 
 ---
 
-## 本轮 Session（2026-05-17，post-fba6082 → 919ded4）完成事项
+## 本轮 Session（2026-05-17，post-919ded4 → c49fe50）完成事项
+
+承接上一轮。本轮重点：**去除储蓄(savings)类型 + Lucide 图标大扩充分组**。1 commit。
+
+### 1. 去除储蓄类型（commit `c49fe50`）
+
+**数据迁移**：
+- `store.js hydrate`：一次性把 `type:"savings"` 的 tx 全改为 `type:"income"`（`txSavingsToIncomeV5` localStorage flag 防重跑）
+- `categories.js`：`CAT_DEFAULTS_VERSION` bump 到 `2026-05-17-v5`，触发 customCategoriesByType 重置
+- `migrateSavingsToIncome()` 新增迁移函数
+- `sync.js`：cloudPull 时也执行一次储蓄→收入迁移，确保云端拉取的数据也被处理
+
+**UI 变化**：
+- 主页"储蓄"toggle → "结余"，显示净结余 = income − expense
+- 手动记账/详情页：type 只剩 expense/income 二选一（删三态循环）
+- 分析页储蓄目标：改为按净结余计算进度，支持 `startDate` 起始日期筛选
+- 目标页：新增日期选择器，可设定从哪天开始计算净结余
+- CSS 变量 `--savings` 全部重命名为 `--goal`
+
+**语音解析**：
+- 储蓄关键词（存/存钱/储蓄/余额宝/理财 等）并入 `VOICE_INCOME_KW`
+- `voiceDetectType` 删除 savings 分支，只返回 expense/income
+- `voiceRemapCategoryByType` income 分支只保留工资/现金/转账/其他（删除储蓄/股票/资产子分类）
+- settings.js 学习规则映射：存→其他、理财→其他、基金→其他、股票→其他
+
+**收入类别**：只保留原 4 个（工资/现金/转账/其他），储蓄/股票/资产不作为类别
+
+### 2. Lucide 图标扩充 + 分组选择器（同 commit）
+
+- `icons.js` + `index.html` inline LUCIDE：新增 38 个图标（smile/book-open/bus/shopping-cart/shirt/tag/bike/fuel/trophy/award/tv/headphones/wrench/laptop/smartphone/phone/mail/credit-card/banknote/receipt/calculator/trending-up/clock/calendar/flag/umbrella/scissors/pencil/graduation-cap/pill/wine/glass-water/map-pin/zap/shield/cloud/lightbulb/landmark），总计 ~73 个
+- `settings.js`：`LUCIDE_PICKER_LIST`(28 平铺) → `LUCIDE_PICKER_GROUPS`(66 个图标分 10 组)
+  - 餐饮(4) · 购物(7) · 交通(6) · 运动(5) · 娱乐(6) · 居家(6) · 工作学习(9) · 医疗(3) · 金融(6) · 通用(14)
+- `components.css`：`.lp-group-label` 样式 + picker max-height 改为 50vh
+- 修复 `tennis-ball` 从未加入 inline LUCIDE 的遗留 bug
+
+---
+
+## 上一轮 Session（2026-05-17，post-fba6082 → 919ded4）完成事项
 
 承接上一轮（多币种 + 学习规则 + 类别重命名）。本轮重点：**登录板块完善 + v2 多笔切分修复 + 词典动词优先重排 + 手动记账时间滚轮 + 品牌图标**。共 12 commit。
 
@@ -226,6 +277,9 @@ export const USE_VOICE_V2 = true;  // 改成 false 即回滚到 v1
 - **iOS 部分老版本对 SVG apple-touch-icon 兼容差**：已用 PNG 兜底；如未来要求严格统一可手工出 1024×1024 + macOS touch bar 尺寸
 
 **本轮已解决**（历史归档）：
+- ✅ ~~储蓄(savings)类型~~（已全面移除，迁移为 income，UI 改为净结余）
+- ✅ ~~图标选择器只有 28 个图标~~（扩充至 66 个，分 10 组）
+- ✅ ~~tennis-ball 图标在 inline LUCIDE 中缺失~~
 - ✅ ~~多笔切分 + v2 合并为单笔~~
 - ✅ ~~手动记账无 daytime 精度~~（换成时间滚轮，更精确）
 - ✅ ~~index.html:454 inline applyTheme()~~
