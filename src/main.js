@@ -31,9 +31,7 @@ import {
   formatTransactionTime, formatTransactionFull,
   formatGroupHeader, formatTransactionTimeInline, formatDay,
 } from "./domain/dates.js";
-import {
-  safeRate, netInEur, sumByTypeInEur,
-} from "./domain/currency.js";
+// （currency.js 的工具函数在用到的模块里直接 import，main.js 不再桥到 window）
 import { attachAudioUnlock } from "./ui/components/sfx.js";
 import { attachNavClicks, registerTab, showTab } from "./ui/components/nav.js";
 import * as wheelTime from "./ui/components/wheel-time.js";
@@ -227,18 +225,8 @@ window.groupListLbl    = formatGroupHeader;
 window.listTimInnerText = formatTransactionTimeInline;
 window.dayL            = formatDay;
 
-// 金额帮手 —— 三个都从 store 取实时汇率（hookInlineSaves 后 store 与 inline.settings 同步）。
-//
-// 设计：
-//   - rate() 仍是无参函数（与 inline 签名一致），返回当前 eurToCny。
-//   - netV(t) / sumT(arr, type) 内部自取汇率，调用方无需关心。
-//
-// 注意性能：每次调用都查一次 store.getSettings()。inline 用闭包 var settings 直接读，
-// 略快但差异在纳秒级，可忽略。
-const _currentRate = () => safeRate(store.getSettings().eurToCny);
-window.rate = _currentRate;
-window.netV = (tx)         => netInEur(tx, _currentRate());
-window.sumT = (arr, type)  => sumByTypeInEur(arr, type, _currentRate());
+// 旧 inline 桥 window.rate / netV / sumT 已删除 —— 调用方早已迁移到模块内
+// netInCny / sumByTypeInCny / convertAmount，不再有任何 caller 读这三个全局。
 
 // 列表渲染：模块版 mainTab.renderList 接受可选 mo（caller 已过滤好的本月数组）。
 // inline render() 末尾调 renderList(mo) 会被覆盖到这里，行为一致。
@@ -309,7 +297,7 @@ window.renderSettings  = settingsTab.render;
 window.setTheme        = settingsTab.setTheme;
 window.setAccent       = settingsTab.setAccent;
 window.setDefCur       = settingsTab.setDefCur;             // 旧 seg-btn 入口（已无 HTML 调用，保留兼容）
-window.setRate         = settingsTab.setRate;
+// 老 window.setRate 桥已删（settingsTab.setRate 不再存在，统一走 setRateForCurrency）
 // v2 多币种 dropdown / 启用切换 / 多汇率 / + 添加
 window.setDefCurFromSelect    = settingsTab.setDefCurFromSelect;
 window.toggleEnabledCurrency  = settingsTab.toggleEnabledCurrency;

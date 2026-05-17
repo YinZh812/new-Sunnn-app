@@ -4,11 +4,13 @@
 // 主题切换实时应用 CSS 变量。
 
 import { byId } from "../../utils/dom.js";
-import { pad2, escapeHtml } from "../../utils/format.js";
+import { pad2, escapeHtml, currencySymbol } from "../../utils/format.js";
 import { store } from "../../state/store.js";
-import { safeRate, sumByTypeInEur } from "../../domain/currency.js";
 import { LEGACY_CAT_LUCIDE } from "../../domain/categories.js";
-import { SUPPORTED_CURRENCIES } from "../../domain/currency.js";
+import {
+  SUPPORTED_CURRENCIES,
+  sumByTypeInCny, convertAmount,
+} from "../../domain/currency.js";
 import { getViewYear, getViewMonth } from "./main.js";
 import {
   setSfxEnabled as _sfxSetEnabled,
@@ -386,11 +388,6 @@ export function setDefCur(el) {
   _toast("已保存");
 }
 
-export function setRate(el) {
-  const v = parseFloat(el.value);
-  if (v > 0) store.setSettings({ eurToCny: v });
-}
-
 export function handleSetSfxEnabled(on, el) {
   _sfxSetEnabled(on);
   if (el) {
@@ -471,7 +468,9 @@ export function doExportRange(format) {
   const s = store.getSettings();
   const viewYear = getViewYear();
   const viewMonth = getViewMonth();
-  const rate = safeRate(s.eurToCny);
+  const ratesToCny = s.ratesToCny || {};
+  const dispCur = s.defaultCurrency || "CNY";
+  const dispSym = currencySymbol(dispCur);
 
   let sorted;
   if (_exportRange === "month") {
@@ -500,7 +499,7 @@ export function doExportRange(format) {
       const desc = String(t.desc || "").replace(/"/g, '""');
       const sg = t.type === "expense" ? "-" : "+";
       rows.push(ds + "," + ts2 + "," + t.category + ',"' + desc + '",' +
-        typeLabel(t.type) + "," + sg + t.amount.toFixed(2) + "," + (t.currency || "EUR"));
+        typeLabel(t.type) + "," + sg + t.amount.toFixed(2) + "," + (t.currency || "CNY"));
     });
     downloadBlob("﻿" + rows.join("\n"), fname + ".csv", "text/csv;charset=utf-8");
     if (box) box.textContent = "已下载 " + fname + ".csv（" + sorted.length + " 笔）";
@@ -526,16 +525,18 @@ export function doExportRange(format) {
     fxSuccess(); _toast("JSON 已下载");
 
   } else {
-    const totIn = sumByTypeInEur(sorted, "income", rate);
-    const totEx = sumByTypeInEur(sorted, "expense", rate);
-    const totSv = sumByTypeInEur(sorted, "savings", rate);
+    // 汇总以 CNY 为基础聚合，再换算到当前默认货币显示
+    const totInDisp = convertAmount(sumByTypeInCny(sorted, "income", ratesToCny),  "CNY", dispCur, ratesToCny);
+    const totExDisp = convertAmount(sumByTypeInCny(sorted, "expense", ratesToCny), "CNY", dispCur, ratesToCny);
+    const totSvDisp = convertAmount(sumByTypeInCny(sorted, "savings", ratesToCny), "CNY", dispCur, ratesToCny);
+    const netDisp = totInDisp - totExDisp;
     const lines = [
       rangeLabel + " 账单",
       "共 " + sorted.length + " 笔", "",
-      "收入合计：+€" + totIn.toFixed(2),
-      "支出合计：-€" + totEx.toFixed(2),
-      "储蓄合计：+€" + totSv.toFixed(2),
-      "净额：" + (totIn - totEx >= 0 ? "+" : "") + "€" + (totIn - totEx).toFixed(2),
+      "收入合计：+" + dispSym + totInDisp.toFixed(2),
+      "支出合计：-" + dispSym + totExDisp.toFixed(2),
+      "储蓄合计：+" + dispSym + totSvDisp.toFixed(2),
+      "净额：" + (netDisp >= 0 ? "+" : "") + dispSym + netDisp.toFixed(2),
       "──────────────",
     ];
     let lastDay = "";
@@ -547,7 +548,7 @@ export function doExportRange(format) {
         lines.push("【" + d.getFullYear() + "年" + (d.getMonth() + 1) + "月" + d.getDate() + "日】");
         lastDay = dayKey;
       }
-      const sym = t.currency === "CNY" ? "¥" : "€";
+      const sym = currencySymbol(t.currency || "CNY");
       const sg = t.type === "expense" ? "−" : "+";
       lines.push("  [" + t.category + "] " + t.desc + " " + sg + sym + t.amount.toFixed(2));
     });

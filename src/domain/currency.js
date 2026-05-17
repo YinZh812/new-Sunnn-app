@@ -1,14 +1,16 @@
 // domain/currency.js —— 货币换算的纯逻辑
 //
 // 不知道 settings 的存在；汇率由调用方传入。
-// UI 层在用之前应当从 store/settings 里读最新的 eurToCny / ratesToCny 喂进来。
+// UI 层在用之前应当从 store/settings 里读最新的 ratesToCny 喂进来。
 //
-// v2 多币种（2026-05）：
+// 多币种（2026-05）：
 //   - SUPPORTED_CURRENCIES：支持的 5 个币种（EUR/CNY/USD/GBP/JPY）
 //   - 基础币：CNY。每个币种存"1 该币 = N CNY"汇率
-//   - convertAmount / toCny / netInCny / sumByTypeInCny：新一代换算（以 CNY 为基础）
-//   - 旧 API（toEur/netInEur/sumByTypeInEur/eurToCny/cnyToEur/totalSavingsInEur）保留
-//     以兼容现有调用方；内部已改成走 ratesToCny["EUR"] 而不是单一的 eurToCny
+//   - convertAmount / toCny / netInCny / sumByTypeInCny：以 CNY 为基础的换算 API
+//
+// 注：早期版本的 EUR-base API（toEur/netInEur/sumByTypeInEur/eurToCny/cnyToEur/
+// totalSavingsInEur/safeRate）已全部删除；调用方迁移到 *InCny + convertAmount。
+// 仅保留 DEFAULT_EUR_TO_CNY 给 store.hydrate 兼容老 localStorage 字段的迁移。
 
 /** 支持的货币清单。code 是 ISO，label 是中文，symbol 是显示符号。 */
 export const SUPPORTED_CURRENCIES = Object.freeze([
@@ -88,69 +90,3 @@ export function sumByTypeInCny(arr, type, ratesToCny) {
     .reduce((acc, t) => acc + txToCny(t, ratesToCny), 0);
 }
 
-/**
- * 标准化汇率：未配置或非正数时回落到默认值。
- * @param {number|null|undefined} eurToCny
- * @returns {number}
- */
-export const safeRate = (eurToCny) => {
-  const r = Number(eurToCny);
-  return Number.isFinite(r) && r > 0 ? r : DEFAULT_EUR_TO_CNY;
-};
-
-/**
- * 把欧元数额换算成人民币。
- * @param {number} amount  欧元金额
- * @param {number} rate    eurToCny（推荐用 safeRate 兜底）
- */
-export const eurToCny = (amount, rate) => amount * safeRate(rate);
-
-/**
- * 把人民币数额换算成欧元。
- * @param {number} amount  人民币金额
- * @param {number} rate    eurToCny（推荐用 safeRate 兜底）
- */
-export const cnyToEur = (amount, rate) => amount / safeRate(rate);
-
-/**
- * 把任意货币的金额标准化成欧元（用于跨币种汇总）。
- * @param {{ amount:number, currency:"EUR"|"CNY" }} tx
- * @param {number} rate  eurToCny
- * @returns {number} 欧元金额
- */
-export const toEur = (tx, rate) =>
-  tx.currency === "CNY" ? cnyToEur(tx.amount, rate) : tx.amount;
-
-/**
- * 单笔欧元化净额：支出取负，其他取正。
- * 与原 inline netV(t) 行为一致。
- * @param {{ amount:number, currency:"EUR"|"CNY", type:string }} tx
- * @param {number} rate
- * @returns {number}
- */
-export const netInEur = (tx, rate) => {
-  const v = toEur(tx, rate);
-  return tx.type === "expense" ? -v : v;
-};
-
-/**
- * 按类型汇总欧元金额。net_income 计入 income。
- * 与原 inline sumT(arr, type) 行为一致。
- * @param {Array<{amount:number, currency:"EUR"|"CNY", type:string}>} arr
- * @param {"income"|"expense"|"savings"} type
- * @param {number} rate
- * @returns {number}
- */
-export const sumByTypeInEur = (arr, type, rate) =>
-  arr
-    .filter((t) => t.type === type || (t.type === "net_income" && type === "income"))
-    .reduce((acc, t) => acc + toEur(t, rate), 0);
-
-/**
- * 累计所有 savings 类型交易的欧元值。储蓄目标进度用。
- * 与原 inline totalSavings() 行为一致。
- * @param {Array<{amount:number, currency:"EUR"|"CNY", type:string}>} arr
- * @param {number} rate
- * @returns {number}
- */
-export const totalSavingsInEur = (arr, rate) => sumByTypeInEur(arr, "savings", rate);

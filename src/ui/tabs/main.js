@@ -15,7 +15,6 @@ import { byId, qsa } from "../../utils/dom.js";
 import { store } from "../../state/store.js";
 import { isInMonth, formatGroupHeader, formatTransactionTimeInline } from "../../domain/dates.js";
 import {
-  safeRate, toEur, netInEur, sumByTypeInEur,
   netInCny, sumByTypeInCny, convertAmount,
 } from "../../domain/currency.js";
 import { getCategoryIcon } from "../../domain/categories.js";
