@@ -450,7 +450,9 @@ function syncCalc(){cOp=null;cPrev=null;cReset=false;document.getElementById("ca
 function selCM(el){document.querySelectorAll(".ym-btn").forEach(function(b){b.classList.remove("sel")});el.classList.add("sel");confirmMonthSel=parseInt(el.getAttribute("data-m"));var tv=document.getElementById("timeSv2");if(tv)tv.textContent=confirmYear+"年"+(confirmMonthSel+1)+"月";if(pending.length===1){var d=new Date(confirmYear,confirmMonthSel,1);pending[0].ts=d.getTime();pending[0].timeLabel=confirmYear+"年"+(confirmMonthSel+1)+"月";pending[0].timePrecision="month"}}
 function tryShowDatePicker(inp,ev){try{if(typeof inp.showPicker==="function"){inp.showPicker()}}catch(e){}}
 
-loadCustomCategories();loadAll();applyTheme();
+loadCustomCategories();loadAll();
+// applyTheme() 已删 —— 已迁移到 settingsTab.applyTheme，由 main.js bootstrap() 调用。
+// inline 同步执行时模块还未加载，直接调会报 ReferenceError。
 // 首屏渲染由模块 bootstrap 的 showTab("main") → mainTab.render() 接管
 initSwipe("sh-confirm","hdl-confirm",function(){closeOv("ov-confirm");pending=[]});
 initSwipe("sh-manual","hdl-manual",function(){saveDraft();closeOv("ov-manual")});
