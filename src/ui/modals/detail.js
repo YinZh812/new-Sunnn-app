@@ -31,7 +31,7 @@ let _manualModal = null;
 let _toast = (msg) => { if (window.showToast) window.showToast(msg); };
 let deleteConfirmIdx = -1;
 
-const TYPE_LABELS = { expense: "支出", income: "收入", savings: "储蓄", net_income: "支出但获得" };
+const TYPE_LABELS = { expense: "支出", income: "收入", net_income: "支出但获得" };
 function typeL(t) { return TYPE_LABELS[t] || "支出"; }
 
 function getCatsByType(type) {
@@ -46,8 +46,7 @@ function getCatIcon(name) {
 }
 
 function amtColor(t) {
-  return t.type === "income" || t.type === "net_income" ? "#1A7A40"
-       : t.type === "savings" ? "#2255AA" : "#CC2222";
+  return t.type === "income" || t.type === "net_income" ? "#1A7A40" : "#CC2222";
 }
 
 // ── 初始化 ──────────────────────────────────────────────────────────────────
@@ -178,8 +177,8 @@ export function detailEditType() {
   const t = txs[detailIdx];
   if (!t) return;
   fxTap();
-  const order = ["expense", "income", "savings"];
-  t.type = order[(order.indexOf(t.type) + 1) % 3];
+  const order = ["expense", "income"];
+  t.type = order[(order.indexOf(t.type) + 1) % 2];
 
   const typed = getCatsByType(t.type);
   if (typed.length && !typed.some((c) => c.name === t.category)) {

@@ -48,7 +48,7 @@ const CASES = [
   { input: "兼职收入200",                                    expectAmount: 200,   expectType: "income",  note: "兼职/收入 加入 income KW" },
   { input: "退款50",                                         expectAmount: 50,    expectType: "income",  note: "退款=收入" },
   { input: "朋友还我100",                                    expectAmount: 100,   expectType: "income",  note: "还款 → 收入（语义修正：方案 A 原本写 expense 是错的）" },
-  { input: "存钱500",                                        expectAmount: 500,   expectType: "savings", note: "储蓄" },
+  { input: "存钱500",                                        expectAmount: 500,   expectType: "income", note: "储蓄→收入" },
   { input: "超市买日用品和零食86.5",                          expectAmount: 86.5,  expectType: "expense", note: "购物复杂描述" },
   { input: "地铁月卡充值200",                                expectAmount: 200,   expectType: "expense", note: "交通充值" },
   { input: "前天停车费15",                                   expectAmount: 15,    expectType: "expense", note: "前天 + 停车" },

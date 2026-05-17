@@ -2,11 +2,12 @@
 //
 // 项目历史上有两套分类体系：
 //   旧（v1）：餐饮/超市/购物/交通/运动/娱乐/医疗/生活/工资/储蓄/彩票/其他（12 个，平铺）
-//   新（v2）：按类型分组 —— expense=吃/买/车/运动/其他，income=工资/现金/转账/其他，savings=储蓄/股票/资产/其他
+//   新（v2）：按类型分组 —— expense=餐饮/购物/交通/运动/其他，income=工资/现金/转账/储蓄/股票/资产/其他
 //
 // 现役 UI 用新的；分析页/历史 CSV 导入仍可能见到旧的，所以两套都保留。
+// 2026-05-17 v5：去除 savings 类型，储蓄/股票/资产子分类并入 income。
 
-export const CAT_DEFAULTS_VERSION = "2026-05-17-v4";
+export const CAT_DEFAULTS_VERSION = "2026-05-17-v5";
 
 /**
  * 按类型分组的默认类别。手动记账面板按 mType 选取这里的列表，
@@ -30,12 +31,6 @@ export const DEFAULT_CATS_BY_TYPE = {
     { name: "工资", icon: "lucide:wallet" },
     { name: "现金", icon: "lucide:gift" },
     { name: "转账", icon: "lucide:ticket" },
-    { name: "其他", icon: "lucide:package" },
-  ],
-  savings: [
-    { name: "储蓄", icon: "lucide:piggy-bank" },
-    { name: "股票", icon: "lucide:gem" },
-    { name: "资产", icon: "lucide:star" },
     { name: "其他", icon: "lucide:package" },
   ],
 };
@@ -84,6 +79,23 @@ export function migrateLegacyTxCategoryNames(txs) {
   return { changed, txs: out };
 }
 
+/**
+ * v5 迁移：把 type:"savings" 的交易全部改为 type:"income"。
+ * 一次性、幂等。返回 { changed, txs }。
+ */
+export function migrateSavingsToIncome(txs) {
+  if (!Array.isArray(txs) || txs.length === 0) return { changed: false, txs };
+  let changed = false;
+  const out = txs.map((t) => {
+    if (t && t.type === "savings") {
+      changed = true;
+      return { ...t, type: "income" };
+    }
+    return t;
+  });
+  return { changed, txs: out };
+}
+
 /** 旧分类 → 着色（分析页饼图、排行榜进度条） */
 export const LEGACY_CAT_COLOR = {
   "餐饮":"#E8845A","超市":"#5BAF72","购物":"#6B8FD4","交通":"#D4A843",
@@ -93,7 +105,7 @@ export const LEGACY_CAT_COLOR = {
 
 /**
  * 取某类型的默认类别清单（深拷贝，避免外部修改）。
- * @param {"expense"|"income"|"savings"} type
+ * @param {"expense"|"income"} type
  */
 export function getDefaultCatsByType(type) {
   const t = type || "expense";
@@ -111,7 +123,7 @@ import { renderIcon, lucideSvg } from "../utils/icons.js";
  * 与原 inline getCatIcon(name) 行为一致。
  *
  * @param {string} name 类别名
- * @param {{expense:Array,income:Array,savings:Array}} customByType
+ * @param {{expense:Array,income:Array}} customByType
  * @param {Object} [opts]
  * @param {number} [opts.size=22]
  * @param {number} [opts.strokeWidth=1.6]
@@ -123,7 +135,7 @@ export function getCategoryIcon(name, customByType, opts = {}) {
 
   // ① 自定义优先
   if (customByType) {
-    for (const list of [customByType.expense, customByType.income, customByType.savings]) {
+    for (const list of [customByType.expense, customByType.income]) {
       if (!Array.isArray(list)) continue;
       for (const c of list) {
         if (c && c.name === name) return renderIcon(c.icon, size, sw);

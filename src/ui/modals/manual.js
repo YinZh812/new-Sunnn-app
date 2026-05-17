@@ -133,11 +133,13 @@ export function open(idx = -1) {
   buildCatGrid();
   buildManualCatRow();
 
-  // 清推荐词
-  const sugRow = byId("manualSugRow");
-  if (sugRow) sugRow.innerHTML = "";
+  // 收起推荐词胶囊
+  const mcSugPill = byId("manualSugPill");
+  if (mcSugPill) mcSugPill.classList.remove("open");
   const mcSugRow = byId("mcSugRow");
   if (mcSugRow) mcSugRow.innerHTML = "";
+  const sugRow = byId("manualSugRow");
+  if (sugRow) sugRow.innerHTML = "";
 
   openOverlay(OVERLAY_ID);
 
@@ -438,6 +440,14 @@ function updateMcTimeBtn() {
 
 // ── 推荐词 ──────────────────────────────────────────────────────────────────
 
+/** 展开/收起推荐词胶囊 */
+export function toggleManualSug() {
+  const pill = byId("manualSugPill");
+  if (!pill) return;
+  const isOpen = pill.classList.toggle("open");
+  if (isOpen) showManualSug();
+}
+
 export function showManualSug() {
   const row = byId("mcSugRow");
   if (!row) return;
@@ -456,10 +466,14 @@ export function showManualSug() {
     .filter((d) => d !== q && deleted.indexOf(d) === -1)
     .sort((a, b) => freq[b] - freq[a])
     .slice(0, 8);
-  if (!tops.length) { row.style.display = "none"; return; }
-  row.style.display = "flex";
-  row.style.flexWrap = "wrap";
-  row.style.gap = "5px";
+
+  if (!tops.length) {
+    const empty = document.createElement("span");
+    empty.className = "sug-pill-empty";
+    empty.textContent = "暂无推荐";
+    row.appendChild(empty);
+    return;
+  }
 
   const isCn = (s) => (s.match(/[一-鿿]/g) || []).length > s.length / 2;
   const truncate = (s) => { const lim = isCn(s) ? 5 : 6; return s.length <= lim ? s : s.slice(0, lim) + "…"; };
@@ -479,10 +493,10 @@ export function showManualSug() {
     ch.appendChild(txt);
     ch.appendChild(del);
     ch.addEventListener("click", (e) => {
+      e.stopPropagation();
       if (e.target === del || e.target.closest(".sug-del")) return;
       const di = byId("mcDescInp"); if (di) di.value = d;
       const di2 = byId("mdesc"); if (di2) di2.value = d;
-      row.style.display = "none";
     });
     row.appendChild(ch);
   });

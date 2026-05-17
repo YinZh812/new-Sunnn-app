@@ -108,7 +108,7 @@ export function render() {
     }
   }
 
-  // 储蓄目标进度（独立于支出/收入 tab，始终显示）
+  // 储蓄目标进度（基于净结余，独立于支出/收入 tab，始终显示）
   if (goals.length) {
     html += renderGoals(goals, txs, rates, dispCur, dispSym);
   }
@@ -208,22 +208,26 @@ function renderBudgets(catTotals, budgets, customByType, dispSym) {
   return html;
 }
 
-// ── 储蓄目标进度 ────────────────────────────────────────────────────────────
+// ── 储蓄目标进度（基于净结余） ─────────────────────────────────────────────
 
 function renderGoals(goals, txs, rates, dispCur, dispSym) {
-  const totalSavCny = sumByTypeInCny(txs, "savings", rates);
-  const totalSav    = convertAmount(totalSavCny, "CNY", dispCur, rates);
   let html = `<div class="s-title">储蓄目标</div>`;
   for (const g of goals) {
-    const pct = Math.min(Math.round(totalSav / g.target * 100), 100);
-    const remaining = Math.max(g.target - totalSav, 0);
+    const filtered = g.startDate
+      ? txs.filter((t) => t.ts >= g.startDate)
+      : txs;
+    const incCny = sumByTypeInCny(filtered, "income", rates);
+    const expCny = sumByTypeInCny(filtered, "expense", rates);
+    const netBal = convertAmount(incCny - expCny, "CNY", dispCur, rates);
+    const pct = g.target > 0 ? Math.min(Math.max(Math.round(netBal / g.target * 100), 0), 100) : 0;
+    const remaining = Math.max(g.target - netBal, 0);
     const remainTxt = pct >= 100 ? "🎉 目标达成！" : `还差 ${dispSym}${remaining.toFixed(2)}`;
     html += `<div class="goal-card">` +
               `<div class="goal-head">` +
                 `<div class="goal-name">🏦 ${g.name}</div>` +
                 `<div class="goal-pct">${pct}%</div>` +
               `</div>` +
-              `<div class="goal-amounts">已累计 ${dispSym}${totalSav.toFixed(2)} / 目标 ${dispSym}${g.target}</div>` +
+              `<div class="goal-amounts">净结余 ${netBal >= 0 ? "" : "−"}${dispSym}${Math.abs(netBal).toFixed(2)} / 目标 ${dispSym}${g.target}</div>` +
               `<div class="goal-track">` +
                 `<div class="goal-fill" style="width:${pct}%"></div>` +
               `</div>` +

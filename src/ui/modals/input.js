@@ -50,8 +50,7 @@ export function open() {
 
 export function close() {
   closeOverlay(OVERLAY_ID);
-  const sugRow = byId("aiSugRow");
-  if (sugRow) { sugRow.style.display = "none"; sugRow.innerHTML = ""; }
+  hideAiSug();
 }
 
 /** 清空输入框并可选关闭弹窗（inline clearInputField 桥接到此）。 */
@@ -170,6 +169,14 @@ function deleteSug(d) {
   }
 }
 
+/** 展开/收起推荐词胶囊 */
+export function toggleInputSug() {
+  const pill = byId("inputSugPill");
+  if (!pill) return;
+  const isOpen = pill.classList.toggle("open");
+  if (isOpen) renderAiSug();
+}
+
 export function renderAiSug() {
   const fInp = byId("field");
   const q = (fInp && fInp.value || "").trim();
@@ -181,20 +188,15 @@ export function renderAiSug() {
 
   const row = byId("aiSugRow");
   if (!row) return;
-  if (!tops.length) { row.style.display = "none"; return; }
-
-  row.style.display = "flex";
-  row.style.alignItems = "center";
-  row.style.gap = "0";
   row.innerHTML = "";
 
-  const lbl = document.createElement("span");
-  lbl.className = "sug-label";
-  lbl.textContent = "推荐";
-  row.appendChild(lbl);
-
-  const wrap = document.createElement("div");
-  wrap.className = "sug-chips-wrap";
+  if (!tops.length) {
+    const empty = document.createElement("span");
+    empty.className = "sug-pill-empty";
+    empty.textContent = "暂无推荐";
+    row.appendChild(empty);
+    return;
+  }
 
   tops.forEach((d) => {
     const ch = document.createElement("div");
@@ -220,23 +222,18 @@ export function renderAiSug() {
     ch.appendChild(txt);
     ch.appendChild(del);
     ch.addEventListener("click", (e) => {
+      e.stopPropagation();
       if (e.target === del || e.target.closest(".sug-del")) return;
       const fi = byId("field");
       if (fi) { fi.value = d + " "; fi.focus(); }
     });
-    wrap.appendChild(ch);
+    row.appendChild(ch);
   });
-
-  row.appendChild(wrap);
 }
 
 export function hideAiSug() {
-  setTimeout(() => {
-    const ov = byId("ov-input");
-    if (ov && ov.style.display !== "none") return;
-    const row = byId("aiSugRow");
-    if (row) row.style.display = "none";
-  }, 180);
+  const pill = byId("inputSugPill");
+  if (pill) pill.classList.remove("open");
 }
 
 // ── 语音识别（Web Speech API） ──────────────────────────────────────────────

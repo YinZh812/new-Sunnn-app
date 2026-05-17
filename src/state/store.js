@@ -27,7 +27,7 @@ import {
 
 import {
   CAT_DEFAULTS_VERSION, DEFAULT_CATS_BY_TYPE, getDefaultCatsByType,
-  migrateLegacyTxCategoryNames,
+  migrateLegacyTxCategoryNames, migrateSavingsToIncome,
 } from "../domain/categories.js";
 import { DEFAULT_EUR_TO_CNY } from "../domain/currency.js";
 import {
@@ -71,7 +71,6 @@ const state = {
   customCategoriesByType: {
     expense: [],
     income:  [],
-    savings: [],
   },
   userName:               DEFAULT_USER_NAME,
   learnedRules:           [],  // v2 阶段 6：个人学习的 phrase → category 规则
@@ -129,6 +128,21 @@ function hydrate() {
     console.warn("[store] tx category rename v3 migration failed:", err);
   }
 
+  // v5 迁移：type:"savings" → type:"income"
+  const SAVINGS_MIGRATION_FLAG = "txSavingsToIncomeV5";
+  try {
+    if (localStorage.getItem(SAVINGS_MIGRATION_FLAG) !== "1") {
+      const { changed, txs } = migrateSavingsToIncome(state.txs);
+      if (changed) {
+        state.txs = txs;
+        persistTxs(state.txs);
+      }
+      localStorage.setItem(SAVINGS_MIGRATION_FLAG, "1");
+    }
+  } catch (err) {
+    console.warn("[store] savings→income v5 migration failed:", err);
+  }
+
   const savedSettings = loadSettings();
   state.settings = savedSettings
     ? { ...DEFAULT_SETTINGS, ...savedSettings, customColors: { ...(savedSettings.customColors || {}) } }
@@ -181,7 +195,6 @@ function hydrateCustomCategories() {
     state.customCategoriesByType = {
       expense: getDefaultCatsByType("expense"),
       income:  getDefaultCatsByType("income"),
-      savings: getDefaultCatsByType("savings"),
     };
     persistCatsByType(state.customCategoriesByType);
     persistCatsVersion(CAT_DEFAULTS_VERSION);
@@ -192,13 +205,11 @@ function hydrateCustomCategories() {
     state.customCategoriesByType = {
       expense: Array.isArray(saved.expense) && saved.expense.length ? saved.expense : getDefaultCatsByType("expense"),
       income:  Array.isArray(saved.income)  && saved.income.length  ? saved.income  : getDefaultCatsByType("income"),
-      savings: Array.isArray(saved.savings) && saved.savings.length ? saved.savings : getDefaultCatsByType("savings"),
     };
   } else {
     state.customCategoriesByType = {
       expense: getDefaultCatsByType("expense"),
       income:  getDefaultCatsByType("income"),
-      savings: getDefaultCatsByType("savings"),
     };
   }
 }

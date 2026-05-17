@@ -133,10 +133,9 @@ export function renderHero() {
   setText("navTitle",  ymCaret);
   setText("an-period", ymCaret);
 
-  // 3. 收入/支出/储蓄（CNY 聚合 + 转到 dispCur 显示）
+  // 3. 收入/支出（CNY 聚合 + 转到 dispCur 显示）
   const incCny = sumByTypeInCny(mo, "income",  rates);
   const expCny = sumByTypeInCny(mo, "expense", rates);
-  const savCny = sumByTypeInCny(mo, "savings", rates);
 
   // 4. 显示币种切换（dispCur 可以是 EUR/CNY/USD/GBP/JPY 中已启用的任意一个）
   //
@@ -147,12 +146,10 @@ export function renderHero() {
   const dispSym = currencySymbol(dispCur);
   const inc = convertAmount(incCny, "CNY", dispCur, rates);
   const exp = convertAmount(expCny, "CNY", dispCur, rates);
-  const sav = convertAmount(savCny, "CNY", dispCur, rates);
 
   // 5. 旧字段（display:none 但保留，便于回退）
   setText("sin",   `${inc.toFixed(2)} ${dispSym}`);
   setText("sout",  `${exp.toFixed(2)} ${dispSym}`);
-  setText("ssave", `${sav.toFixed(2)} ${dispSym}`);
 
   // 6. 顶部货币切换按钮
   setText("curToggleBtn", dispSym);
@@ -167,8 +164,9 @@ export function renderHero() {
   setText("a2-expense-int", expS.int);
   setText("a2-expense-dec", expS.dec);
 
-  // 8. 储蓄浮层
-  setText("savings-panel-amt", `${sav.toFixed(2)} ${dispSym}`);
+  // 8. 净结余浮层：本月净结余 = 收入 − 支出
+  const netBal = inc - exp;
+  setText("savings-panel-amt", `${netBal >= 0 ? "" : "−"}${Math.abs(netBal).toFixed(2)} ${dispSym}`);
 }
 
 // ── 列表渲染 ────────────────────────────────────────────────────────────────

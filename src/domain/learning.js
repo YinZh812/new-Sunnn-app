@@ -19,7 +19,7 @@ const MIN_PHRASE_LEN = 2;
  * 规则数据形状。
  * @typedef {Object} LearnedRule
  * @property {string} phrase      原始 phrase（保留大小写）
- * @property {"expense"|"income"|"savings"} type
+ * @property {"expense"|"income"} type
  * @property {string} category    目标分类名
  * @property {number} hits        累计命中次数（首次创建为 1）
  * @property {number} lastUsed    最近一次创建/更新/命中的时间戳
@@ -42,7 +42,7 @@ function normalizePhrase(phrase) {
  *
  * @param {LearnedRule[]} rules 当前规则数组
  * @param {string} phrase
- * @param {"expense"|"income"|"savings"} type
+ * @param {"expense"|"income"} type
  * @param {string} category
  * @returns {LearnedRule[]} 新数组（不修改原数组）
  */
@@ -79,7 +79,7 @@ export function clearLearning() {
  * 在 text 中查找最长匹配的学习规则。仅匹配 type 一致的。
  *
  * @param {string} text       要匹配的原始文本（用 voiceCleanDesc 输出或整段都行；二者皆能命中）
- * @param {"expense"|"income"|"savings"} type
+ * @param {"expense"|"income"} type
  * @param {LearnedRule[]} rules
  * @returns {LearnedRule|null}
  */

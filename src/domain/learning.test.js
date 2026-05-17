@@ -82,7 +82,7 @@ export function runLearningTests() {
   assertEq(applyLearnedRules("外卖35", "expense", r1), "餐饮", "命中 expense '外卖' → 餐饮");
   assertEq(applyLearnedRules("外卖打车30", "expense", r1), "交通", "更长 phrase 优先");
   assertEq(applyLearnedRules("外卖35", "income", r1), "其他", "type 隔离：income 走 income 的 '外卖'");
-  assertEq(applyLearnedRules("我没说外卖", "savings", r1), null, "无匹配 type → null");
+  assertEq(applyLearnedRules("我没说外卖", "income", r1), null, "无匹配 → null（income 没有匹配该文本的 phrase）");
   assertEq(applyLearnedRules("starbucks10", "expense", r1), "餐饮", "大小写不敏感");
   assertEq(applyLearnedRules("", "expense", r1), null, "空文本 → null");
   assertEq(applyLearnedRules("外卖", "expense", []), null, "空规则 → null");

@@ -138,7 +138,7 @@ function getEffectiveColor(varName) {
 }
 
 function typeLabel(t) {
-  return { expense: "支出", income: "收入", savings: "储蓄", net_income: "支出但获得" }[t] || "支出";
+  return { expense: "支出", income: "收入", net_income: "支出但获得" }[t] || "支出";
 }
 
 // ── 初始化 ──────────────────────────────────────────────────────────────────
@@ -528,15 +528,13 @@ export function doExportRange(format) {
     // 汇总以 CNY 为基础聚合，再换算到当前默认货币显示
     const totInDisp = convertAmount(sumByTypeInCny(sorted, "income", ratesToCny),  "CNY", dispCur, ratesToCny);
     const totExDisp = convertAmount(sumByTypeInCny(sorted, "expense", ratesToCny), "CNY", dispCur, ratesToCny);
-    const totSvDisp = convertAmount(sumByTypeInCny(sorted, "savings", ratesToCny), "CNY", dispCur, ratesToCny);
     const netDisp = totInDisp - totExDisp;
     const lines = [
       rangeLabel + " 账单",
       "共 " + sorted.length + " 笔", "",
       "收入合计：+" + dispSym + totInDisp.toFixed(2),
       "支出合计：-" + dispSym + totExDisp.toFixed(2),
-      "储蓄合计：+" + dispSym + totSvDisp.toFixed(2),
-      "净额：" + (netDisp >= 0 ? "+" : "") + dispSym + netDisp.toFixed(2),
+      "净结余：" + (netDisp >= 0 ? "+" : "") + dispSym + netDisp.toFixed(2),
       "──────────────",
     ];
     let lastDay = "";
@@ -748,7 +746,7 @@ function mapImportedCategory(name) {
     "礼物": "购物", "游戏": "娱乐", "其它": "其他", "零食": "餐饮", "出行": "交通",
     "车": "交通", "公交": "交通", "网购": "购物", "旅游": "娱乐", "看电影": "娱乐",
     "看病": "医疗", "药": "医疗", "薪": "工资", "薪资": "工资", "奖金": "工资",
-    "收入": "工资", "存": "储蓄", "理财": "储蓄", "基金": "储蓄", "股票": "储蓄",
+    "收入": "工资", "存": "其他", "理财": "其他", "基金": "其他", "股票": "其他",
   };
   if (map[s]) return map[s];
   for (const k in map) {
@@ -774,7 +772,7 @@ function normalizeImportedTx(r, i) {
   let amt = parseFloat(String(r.amount || "0").replace(/[^\d.\-]/g, ""));
   if (isNaN(amt)) amt = 0;
   let typ = normalizeType(String(r.type || ""));
-  if (/^[-−]/.test(String(r.amount || "")) && typ !== "savings") typ = "expense";
+  if (/^[-−]/.test(String(r.amount || "")) && typ !== "income") typ = "expense";
   return {
     ts, amount: Math.abs(amt),
     desc: String(r.desc || "").trim(),
@@ -800,8 +798,7 @@ function parseImportDate(ds, tms) {
 
 function normalizeType(s) {
   s = String(s || "").toLowerCase().trim();
-  if (/income|收入|工资/.test(s)) return "income";
-  if (/saving|储蓄/.test(s)) return "savings";
+  if (/income|收入|工资|saving|储蓄/.test(s)) return "income";
   return "expense";
 }
 
@@ -1028,7 +1025,18 @@ export function resetAllCustomColors() {
 
 // ── 类别设置 UI ───────────────────────────────────────────────────────────────
 
-const LUCIDE_PICKER_LIST = ["utensils","coffee","shopping-bag","store","gamepad-2","film","music","camera","car","plane","bus","home","heart-pulse","heart","dumbbell","wallet","piggy-bank","ticket","gift","gem","flame","star","sun","moon","book","book-open","briefcase","smile","package","target"];
+const LUCIDE_PICKER_GROUPS = [
+  { label: "餐饮", icons: ["utensils","coffee","wine","glass-water"] },
+  { label: "购物", icons: ["shopping-bag","shopping-cart","store","shirt","tag","scissors","gem"] },
+  { label: "交通", icons: ["car","bus","bike","plane","fuel","map-pin"] },
+  { label: "运动", icons: ["tennis-ball","dumbbell","trophy","award","flame"] },
+  { label: "娱乐", icons: ["film","music","gamepad-2","camera","tv","headphones"] },
+  { label: "居家", icons: ["home","landmark","lightbulb","wrench","umbrella","cloud"] },
+  { label: "工作学习", icons: ["briefcase","laptop","smartphone","mail","calculator","pencil","book","book-open","graduation-cap"] },
+  { label: "医疗", icons: ["heart-pulse","pill","shield"] },
+  { label: "金融", icons: ["wallet","piggy-bank","credit-card","banknote","receipt","trending-up"] },
+  { label: "通用", icons: ["star","heart","smile","sun","moon","zap","clock","calendar","flag","gift","phone","ticket","package","target"] },
+];
 
 export function openCatSettings() {
   renderCatSettings();
@@ -1154,13 +1162,19 @@ export function openLucidePicker(onPick, onEmoji) {
   if (!ov) return;
   const grid = document.getElementById("lucide-picker-grid");
   grid.innerHTML = "";
-  LUCIDE_PICKER_LIST.forEach(function (n) {
-    const c = document.createElement("div");
-    c.className = "lp-cell";
-    c.innerHTML = lucideSvg(n, 24, 1.6);
-    c.title = n;
-    c.onclick = function () { closeLucidePicker(); onPick(n); };
-    grid.appendChild(c);
+  LUCIDE_PICKER_GROUPS.forEach(function (g) {
+    const hdr = document.createElement("div");
+    hdr.className = "lp-group-label";
+    hdr.textContent = g.label;
+    grid.appendChild(hdr);
+    g.icons.forEach(function (n) {
+      const c = document.createElement("div");
+      c.className = "lp-cell";
+      c.innerHTML = lucideSvg(n, 24, 1.6);
+      c.title = n;
+      c.onclick = function () { closeLucidePicker(); onPick(n); };
+      grid.appendChild(c);
+    });
   });
   document.getElementById("lp-emoji-btn").onclick = function () {
     closeLucidePicker();
@@ -1350,7 +1364,7 @@ export function setRateForCurrency(code, value) {
 // 渲染 "我的个人词典" 卡片。在 render() 的 body.innerHTML 末尾调用。
 // 学习规则保存在 store.getLearnedRules()，结构 { phrase, type, category, hits, lastUsed }。
 
-const TYPE_LABEL_CN = { expense: "支出", income: "收入", savings: "储蓄" };
+const TYPE_LABEL_CN = { expense: "支出", income: "收入" };
 
 function renderLearnedRulesCard() {
   const rules = store.getLearnedRules();
@@ -1407,7 +1421,7 @@ function renderLearnedRulesCard() {
 /**
  * onclick handler：删除单条学习规则。
  * @param {string} phraseEncoded 经 encodeURIComponent 编码的 phrase（避免 onclick 字符串注入）
- * @param {string} type expense / income / savings
+ * @param {string} type expense / income
  */
 export function handleRemoveLearnedRule(phraseEncoded, type) {
   fxDelete();

@@ -34,11 +34,10 @@ const HANDLE_ID  = "hdl-confirm";
 let _pending = [];
 let _toast = (msg) => { if (window.showToast) window.showToast(msg); };
 
-const TYPE_LABELS = { expense: "支出", income: "收入", savings: "储蓄", net_income: "支出但获得" };
+const TYPE_LABELS = { expense: "支出", income: "收入", net_income: "支出但获得" };
 function typeL(t) { return TYPE_LABELS[t] || "支出"; }
 function amtColor(t) {
-  return t.type === "income" || t.type === "net_income" ? "#1A7A40"
-       : t.type === "savings" ? "#2255AA" : "#CC2222";
+  return t.type === "income" || t.type === "net_income" ? "#1A7A40" : "#CC2222";
 }
 function sym(t) { return currencySymbol(t.currency); }
 function sign(t) { return t.type === "expense" ? "−" : "+"; }
@@ -264,7 +263,7 @@ export function editCategory() {
 export function editType() {
   const t = _pending[0];
   if (!t) return;
-  const order = ["expense", "income", "savings"];
+  const order = ["expense", "income"];
   t.type = order[(order.indexOf(t.type) + 1) % order.length];
   fxTap();
 

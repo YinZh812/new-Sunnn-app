@@ -22,6 +22,10 @@ let _pushTimer = null;
 let _isSyncing = false;
 let _hasInitialPull = false;
 
+// 本地删除追踪：记住被删除的 tx id，push 时标记 deleted=true
+const _pendingDeleteIds = new Set();
+let _prevTxIds = new Set();
+
 const _statusListeners = new Set();
 let _currentStatus = "idle"; // 'idle' | 'syncing' | 'synced' | 'error'
 
@@ -70,6 +74,26 @@ function _ensureTxIds(txs) {
   return { txs: enhanced, changed };
 }
 
+// ── 本地删除检测 ────────────────────────────────────────────────────────────
+
+/**
+ * 对比前后 tx ID 集合，把消失的 id 加入 _pendingDeleteIds。
+ * 在 cloudPull 合并期间跳过检测（_isSyncing=true），避免把云端未拉到的 tx 误判为删除。
+ */
+function _detectDeletedTxs() {
+  if (_isSyncing) return;
+  const currentIds = new Set(store.getTxs().map((t) => t.id).filter(Boolean));
+  for (const id of _prevTxIds) {
+    if (!currentIds.has(id)) _pendingDeleteIds.add(id);
+  }
+  _prevTxIds = currentIds;
+}
+
+/** cloudPull 结束后刷新 _prevTxIds 快照（不做 diff）。 */
+function _snapshotTxIds() {
+  _prevTxIds = new Set(store.getTxs().map((t) => t.id).filter(Boolean));
+}
+
 // ── 拉取 ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -102,11 +126,12 @@ export async function cloudPull() {
         return d;
       });
 
-    // 与本地按 id 合并：last-write-wins
+    // 与本地按 id 合并：last-write-wins（排除本地待删除的 tx）
     const { txs: localTxsWithIds } = _ensureTxIds(store.getTxs());
     const byId = {};
     for (const t of localTxsWithIds) byId[t.id] = t;
     for (const c of cloudTxs) {
+      if (_pendingDeleteIds.has(c.id)) continue;
       const local = byId[c.id];
       if (!local || (c.updatedAt || 0) >= (local.updatedAt || 0)) {
         byId[c.id] = c;
@@ -114,6 +139,7 @@ export async function cloudPull() {
     }
     const merged = Object.values(byId).sort((a, b) => b.ts - a.ts);
     store.setTxs(merged);  // 触发 txs:changed → UI re-render
+    _snapshotTxIds();       // 刷新快照，避免 merge 写回触发误删检测
 
     // 用户设置
     const rSet = await client
@@ -179,6 +205,23 @@ export async function cloudPush(forceAll = false) {
       }
     }
 
+    // 2b. 把本地删除的 tx 在云端标记 deleted=true
+    if (_pendingDeleteIds.size) {
+      const delPayload = [..._pendingDeleteIds].map((id) => ({
+        user_id: user.id,
+        id: String(id),
+        data: {},
+        updated_at: new Date().toISOString(),
+        deleted: true,
+      }));
+      for (let i = 0; i < delPayload.length; i += TXS_BATCH_SIZE) {
+        const slice = delPayload.slice(i, i + TXS_BATCH_SIZE);
+        const r = await client.from("transactions").upsert(slice, { onConflict: "user_id,id" });
+        if (r.error) throw r.error;
+      }
+      _pendingDeleteIds.clear();
+    }
+
     // 3. 推用户设置（单行 upsert）
     const setRow = {
       user_id: user.id,
@@ -227,16 +270,22 @@ export async function manualSync() {
  *   2. 监听 auth.onAuthChange → 登录时拉云端，注销时复位
  */
 export function attachSync() {
+  // ⓪ 初始化 tx ID 快照（hydrate 后的基线）
+  _snapshotTxIds();
+
   // ① store 变化 → 推云端
-  const events = [
-    "txs:changed",
+  store.on("txs:changed", () => {
+    _detectDeletedTxs();
+    cloudPushDebounced();
+  });
+  const otherEvents = [
     "settings:changed",
     "budgets:changed",
     "goals:changed",
     "deletedSugs:changed",
     "cats:changed",
   ];
-  for (const evt of events) {
+  for (const evt of otherEvents) {
     store.on(evt, () => cloudPushDebounced());
   }
 

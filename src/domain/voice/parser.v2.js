@@ -20,7 +20,6 @@ import {
   BRAND_MAP,
   VOICE_CAT_MAP,
   VOICE_INCOME_KW,
-  VOICE_SAVINGS_KW,
   TOTAL_WORDS,
   QUANTIFIERS,
   TIME_RELATIVE,
@@ -59,9 +58,6 @@ export function voiceDetectType(text) {
   const lower = text.toLowerCase();
   for (const kw of VOICE_INCOME_KW) {
     if (lower.includes(kw.toLowerCase())) return "income";
-  }
-  for (const kw of VOICE_SAVINGS_KW) {
-    if (lower.includes(kw.toLowerCase())) return "savings";
   }
   return "expense";
 }
@@ -445,13 +441,6 @@ export function voiceRemapCategoryByType(text, type) {
     if (/工资|薪水|薪资|薪金|月薪|年薪|奖金|年终奖|提成|分红|利息|理财收益|工钱|salary|wage|bonus/i.test(text)) return "工资";
     if (/现金|cash|领钱|发现金|收现金|手现金|纸币|硬币/i.test(text)) return "现金";
     if (/转账|转我|转给我|微信转|支付宝转|银行转|汇款|wire|transfer|wise|paypal|paysend|venmo|revolut|发红包|微信红包|支付宝红包|发我红包/i.test(text)) return "转账";
-    return "其他";
-  }
-
-  if (type === "savings") {
-    if (/股票|stock|股市|基金|fund|etf|公募|私募|定投/i.test(text)) return "股票";
-    if (/资产|asset|投资|理财|房产|不动产|黄金|gold|加密|crypto|btc|eth|比特币|以太坊/i.test(text)) return "资产";
-    if (/储蓄|存钱|存款|定存|活期|deposit|saving/i.test(text)) return "储蓄";
     return "其他";
   }
 

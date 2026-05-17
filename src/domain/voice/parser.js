@@ -12,7 +12,6 @@ import {
   BRAND_MAP,
   VOICE_CAT_MAP,
   VOICE_INCOME_KW,
-  VOICE_SAVINGS_KW,
 } from "./dictionary.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,11 +41,11 @@ export function voiceDetectCategory(text) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 类型识别：expense / income / savings
+// 类型识别：expense / income
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * 返回 "expense" | "income" | "savings"。
+ * 返回 "expense" | "income"。
  * 特判："赌我…不…" → income（赌某事不发生赢钱，归到收入）。
  */
 export function voiceDetectType(text) {
@@ -54,9 +53,6 @@ export function voiceDetectType(text) {
   const lower = text.toLowerCase();
   for (const kw of VOICE_INCOME_KW) {
     if (lower.includes(kw.toLowerCase())) return "income";
-  }
-  for (const kw of VOICE_SAVINGS_KW) {
-    if (lower.includes(kw.toLowerCase())) return "savings";
   }
   return "expense";
 }
@@ -267,9 +263,9 @@ export function voiceSplitInput(text) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * 根据 type（expense/income/savings）把文本重映射到对应分类。
+ * 根据 type（expense/income）把文本重映射到对应分类。
  * 例如 voiceDetectCategory 会返回内部标签（吃/玩/购物/其他），
- * 而 UI 期望落到 expense=[吃/买/车/运动/其他] 这种新分类组里。
+ * 而 UI 期望落到 expense=[餐饮/购物/交通/运动/其他] 这种新分类组里。
  */
 export function voiceRemapCategoryByType(text, type) {
   const lower = String(text || "").toLowerCase();
@@ -278,13 +274,6 @@ export function voiceRemapCategoryByType(text, type) {
     if (/工资|薪水|薪资|薪金|月薪|年薪|奖金|年终奖|提成|分红|利息|理财收益|工钱|salary|wage|bonus/i.test(text)) return "工资";
     if (/现金|cash|领钱|发现金|收现金|手现金|纸币|硬币/i.test(text)) return "现金";
     if (/转账|转我|转给我|微信转|支付宝转|银行转|汇款|wire|transfer|wise|paypal|paysend|venmo|revolut|发红包|微信红包|支付宝红包|发我红包/i.test(text)) return "转账";
-    return "其他";
-  }
-
-  if (type === "savings") {
-    if (/股票|stock|股市|基金|fund|etf|公募|私募|定投/i.test(text)) return "股票";
-    if (/资产|asset|投资|理财|房产|不动产|黄金|gold|加密|crypto|btc|eth|比特币|以太坊/i.test(text)) return "资产";
-    if (/储蓄|存钱|存款|定存|活期|deposit|saving/i.test(text)) return "储蓄";
     return "其他";
   }
 
@@ -322,7 +311,7 @@ export function voiceRemapCategoryByType(text, type) {
  * @typedef {Object} ParseOptions
  * @property {"EUR"|"CNY"} defaultCurrency  必填。无货币标记时回落到此。
  * @property {Object<string, Array<{name:string}>>} [allowedCategoriesByType]
- *           可选。形如 { expense: [{name:"餐饮"},{name:"购物"},...], income:[...], savings:[...] }
+ *           可选。形如 { expense: [{name:"餐饮"},{name:"购物"},...], income:[...] }
  *           传入时：重映射结果若不在允许列表里，归到"其他"。不传则跳过此校验。
  */
 
@@ -333,8 +322,8 @@ export function voiceRemapCategoryByType(text, type) {
  * @property {boolean} needCurrencyConfirm 是否需要 UI 弹窗确认货币
  * @property {number|null} amount
  * @property {"EUR"|"CNY"} currency
- * @property {string} category             目标类别（已经是 expense/income/savings 各自分类组里的名字）
- * @property {"expense"|"income"|"savings"} type
+ * @property {string} category             目标类别（已经是 expense/income 各自分类组里的名字）
+ * @property {"expense"|"income"} type
  * @property {string} desc
  * @property {number} ts
  * @property {string} timeLabel

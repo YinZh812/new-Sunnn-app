@@ -278,7 +278,7 @@ function hookInlineSaves() {
   // 触发 cats:changed → manual.js / detail.js 等订阅者重渲染。
   wrap("saveCustomCategories",
        () => window.customCategoriesByType,
-       (v) => store.setCustomCategoriesByType(v || { expense: [], income: [], savings: [] }));
+       (v) => store.setCustomCategoriesByType(v || { expense: [], income: [] }));
   // 低频字段（budgets/goals/deletedSugs）等真正的模块需要时再加。
 }
 
@@ -374,8 +374,9 @@ window.iaDateChange  = mainTab.iaDateChange;
 window.toggleVoice = inputModal.toggleVoice;
 
 // ── 桥接 renderAiSug ────────────────────────────────────────────────────────
-window.renderAiSug = inputModal.renderAiSug;
-window.hideAiSug   = inputModal.hideAiSug;
+window.renderAiSug    = inputModal.renderAiSug;
+window.hideAiSug      = inputModal.hideAiSug;
+window.toggleInputSug = inputModal.toggleInputSug;
 
 // ── 桥接 renderGoals 及其 onclick 依赖 ──────────────────────────────────────
 window.renderGoals     = goalsTab.render;
@@ -423,6 +424,7 @@ window.saveDraft          = manualModal.saveDraft;
 window.restoreDraft       = manualModal.restoreDraft;
 window.buildManualCatRow  = manualModal.buildManualCatRow;
 window.showManualSug      = manualModal.showManualSug;
+window.toggleManualSug    = manualModal.toggleManualSug;
 
 // ── 桥接 auth modal 及其 onclick 依赖 ───────────────────────────────────────
 //

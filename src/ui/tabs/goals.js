@@ -1,6 +1,6 @@
 // ui/tabs/goals.js —— 目标页（#page-goals）
 //
-// 月度预算 + 储蓄目标 CRUD + 进度展示。
+// 月度预算 + 储蓄目标（基于净结余）CRUD + 进度展示。
 
 import { byId } from "../../utils/dom.js";
 import { store } from "../../state/store.js";
@@ -70,13 +70,23 @@ export function render() {
     '<span style="display:inline-flex;align-items:center;color:var(--acc)">' + lucideSvg("settings", 16, 1.6) + '</span>编辑类别</div>';
 
   // 目标列表
-  const goalList = goals.map((g, i) =>
-    '<div class="bsr">' +
+  const goalList = goals.map((g, i) => {
+    const startLbl = g.startDate
+      ? new Date(g.startDate).toLocaleDateString("zh-CN", { year: "numeric", month: "short", day: "numeric" }) + " 起"
+      : "全部历史";
+    return '<div class="bsr" style="flex-wrap:wrap">' +
       '<div class="bsr-name">🏦 ' + g.name + '</div>' +
       '<div class="bsr-cur">目标 €' + g.target + '</div>' +
       '<div style="cursor:pointer;color:var(--expense);font-size:12px;padding:0 8px" onclick="deleteGoal(' + i + ')">删除</div>' +
-    '</div>'
-  ).join("");
+      '<div style="width:100%;font-size:10px;color:var(--t3);padding:0 14px 4px">' + startLbl + '</div>' +
+    '</div>';
+  }).join("");
+
+  // 获取最早交易日期，用于 date input 的 min 值
+  const txs = store.getTxs();
+  const minDateStr = txs.length
+    ? new Date(Math.min(...txs.map((t) => t.ts))).toISOString().slice(0, 10)
+    : "";
 
   // 写入 DOM
   const bEl = byId("goals-budget-section");
@@ -92,8 +102,14 @@ export function render() {
       '<div class="goal-form">' +
         '<input type="text" id="goalName" placeholder="目标名称（如：买车、旅游）">' +
         '<input type="number" id="goalAmt" placeholder="目标金额（欧元）" step="100">' +
+        '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2)">' +
+          '<span>起始日期</span>' +
+          '<input type="date" id="goalStartDate" style="flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--bdr);border-radius:6px;background:var(--card);color:var(--t1)"' +
+            (minDateStr ? ' min="' + minDateStr + '"' : '') + '>' +
+          '<span style="font-size:10px;color:var(--t3)">不填则从全部历史计算</span>' +
+        '</div>' +
         '<div class="goal-form-row">' +
-          '<button class="gf-no" onclick="document.getElementById(\'goalName\').value=\'\';document.getElementById(\'goalAmt\').value=\'\'">清空</button>' +
+          '<button class="gf-no" onclick="document.getElementById(\'goalName\').value=\'\';document.getElementById(\'goalAmt\').value=\'\';document.getElementById(\'goalStartDate\').value=\'\'">清空</button>' +
           '<button class="gf-ok" onclick="addGoal()">添加目标</button>' +
         '</div>' +
       '</div></div>';
@@ -116,11 +132,16 @@ export function setBudget(el) {
 export function addGoal() {
   const nameEl = byId("goalName");
   const amtEl = byId("goalAmt");
+  const dateEl = byId("goalStartDate");
   const name = nameEl ? nameEl.value.trim() : "";
   const amt = amtEl ? parseFloat(amtEl.value) : 0;
   if (!name || !amt || amt <= 0) { _toast("请填写名称和金额"); return; }
+  const goal = { name, target: amt, id: Date.now() };
+  if (dateEl && dateEl.value) {
+    goal.startDate = new Date(dateEl.value + "T00:00:00").getTime();
+  }
   const goals = store.getGoals().slice();
-  goals.push({ name, target: amt, id: Date.now() });
+  goals.push(goal);
   store.setGoals(goals);
   render();
   _toast("目标已添加 ✓");
