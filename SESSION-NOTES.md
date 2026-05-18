@@ -18,9 +18,9 @@ git merge claude/<worktree分支名> --no-edit
 
 ---
 
-## 一句话现状（2026-05-17）
+## 一句话现状（2026-05-18）
 
-**架构重构 + 语音解析 v2 + 学习规则 + 多币种 + 多笔切分 + 动词优先词典 + 手动记账时间滚轮 + Google OAuth + 品牌图标 + 去除储蓄类型 + Lucide 图标扩充** 全部完成并部署。
+**架构重构 + 语音解析 v2 + 学习规则 + 多币种 + 多笔切分 + 动词优先词典 + 手动记账时间滚轮 + Google OAuth + 品牌图标 + 去除储蓄类型 + Lucide 图标扩充 + 预算 UI 重构 + 颜色选择器独立 HEX + 滚轮式年月选择器** 全部完成并部署。
 
 - `index.html` ~520 行（入口 + ~160 行胶水 inline）
 - 36+ 个 JS 模块 ~8200 行，严格三层架构（utils → domain → state → ui）
@@ -39,7 +39,94 @@ git merge claude/<worktree分支名> --no-edit
 
 ---
 
-## 本轮 Session（2026-05-17，post-919ded4 → c49fe50）完成事项
+## 本轮 Session（2026-05-18，post-8b31d19 → b87995a）完成事项
+
+承接上一轮（预算 UI 重构 + 5 项用户反馈修复）。本轮重点：**类别双向同步修复 + 颜色选择器 HEX 独立 + 年月选择器改滚轮 + 滚轮有交易年月高亮**。3 commits。
+
+### 1. 类别双向同步修复 + 颜色 HEX 双行 + 重置按钮边框（commit `5b0479d`）
+
+**类别双向同步**（`settings.js` + `goals.js`）：
+
+- `deleteCat()`：同时从 `budgetCatOrder` 和预算金额中移除对应类别，避免幽灵条目
+- `addNewCat()`：同时向 `budgetCatOrder` 添加新类别
+- 类别重命名 `onblur`：先更新 `budgetCatOrder` 再调 `saveCustomCategories()`，避免中间状态触发 `getBudgetCatList` 产生重复条目
+- `getBudgetCatList()`：去掉 `expCats` 自动合并逻辑（改由双向同步显式处理），防止竞态条件
+- 预算删除操作重排序：先从 expense 移除（`store.setCustomCategoriesByType`）再从 budgetCatOrder 移除（`store.setSettings`），避免中间状态
+
+**颜色 HEX 双行**（`index.html`）：
+
+- 上方 `#cppHexHue` 显示色相滑块纯色（`onclick="editHexHue()"`）
+- 下方 `#cppHex` 显示最终颜色（`onclick="editHexLit()"`）
+
+**重置按钮边框**（`index.html`）：
+
+- 重置按钮从 `set-card` 容器改为普通 `div`，添加 `border:none`
+
+### 2. 颜色选择器 HEX 独立 + 年月选择器改滚轮（commit `7d8c02b`）
+
+**颜色选择器 HEX 独立**（`settings.js` + `main.js`）：
+
+- 新增 `editHexHue()`：点击上方 HEX 只修改色相（`_cppCurHue`），保持明暗不变
+- 新增 `editHexLit()`：点击下方 HEX 只修改明暗（`_cppCurLit`），保持色相不变
+- `applyCppLive()`：分别更新两个 HEX 显示值
+  - `cppHexHue` = `hslToHex(hue, 80, 50)`（纯色相，固定明度 50）
+  - `cppHex` = `hslToHex(hue, 80, lit)`（最终颜色）
+- `openColorPicker()`：初始化时独立设置两个 HEX 值
+- `main.js`：添加 `window.editHexHue` / `window.editHexLit` 桥接
+
+**年月选择器改滚轮**（`month-picker.js` + `index.html` + `components.css`）：
+
+- 完全重写 `month-picker.js`：从网格卡片（年月切换视图）改为 iOS 风格双列滚轮
+- 复用 `InfiniteWheel` 类（惯性滚动 + 吸附物理），与 `wheel-time.js` 相同实现
+- 左列 = 年份（当前年 −10 ~ +5），右列 = 月份（01-12）
+- `index.html`：mpicker 内部标记改为 `wheel-time-picker` 布局（`#wheelYear` + `#wheelMonth`）
+- `components.css`：移除旧网格样式（`.mpicker-head`, `.mpicker-grid`, `.mpm`, `.year-grid`, `.yr-btn` 等），简化为 `.mpicker` + `.mpicker-box`
+- `main.js`：`window.openPicker` / `window.closePicker` / `window.confirmPicker` + 旧接口空壳
+- 旧函数（`toggleYM`, `pickerNav`, `selYear`, `selMonth`）保留为空壳避免报错
+
+### 3. 年月滚轮有交易高亮（commit `b87995a`）
+
+**`month-picker.js`**：
+
+- `InfiniteWheel` 新增 `highlightFn(value)` 回调参数
+- `_render()`：根据回调结果调整样式
+  - 有交易：正常透明度 + `fontWeight: 600`（粗体）
+  - 无交易：透明度 × 0.35 + `fontWeight: 400`（细体）
+- `open()`：从 `store.getTxs()` 构建两个 Set
+  - `txYearSet`：有交易的年份集合
+  - `txYearMonthSet`：`"YYYY-M"` 格式的年月集合（M = 1-12）
+- 年份列 `highlightFn`：`(year) => txYearSet.has(year)`
+- 月份列 `highlightFn`：**动态联动年份滚轮**，每帧读取 `_yearInst.getValue()` 判断该年该月是否有交易
+  - 滚动年份时月份高亮实时变化（同一个 rAF 循环内）
+
+---
+
+### Git 提交历史（本轮 session）
+
+```
+b87995a 年月滚轮：有交易的年月加深显示，无交易的变淡
+7d8c02b 颜色选择器HEX独立 + 年月选择器改滚轮
+5b0479d 修复3项反馈：类别双向同步 + 颜色HEX双行 + 重置按钮边框
+```
+
+---
+
+## 上一轮 Session（2026-05-17 ~ 05-18，post-c49fe50 → 8b31d19）完成事项
+
+承接上一轮。本轮重点：**预算 UI 重构 + 多笔编辑弹窗 + 5 项用户反馈修复**。4 commits。
+
+### 涉及 commits
+
+```
+8b31d19 修复5项用户反馈：预算类别联动 + 多笔编辑弹窗 + 颜色HEX + 重置UI + 极夜可见性
+4487fb0 预算 UI 重构：默认类别对齐支出分类 + 预算编辑器用 store + 目标图标编辑
+e8f034e 第二批改进：多笔确认页编辑 + 拖拽柄清理 + 图标中文名 + 预算货币 + 重置功能
+04a9dc1 批量修复：类别名/货币标签/下拉条/图标中文名/重置按钮等 9 项
+```
+
+---
+
+## 再上一轮 Session（2026-05-17，post-919ded4 → c49fe50）完成事项
 
 承接上一轮。本轮重点：**去除储蓄(savings)类型 + Lucide 图标大扩充分组**。1 commit。
 
@@ -277,6 +364,9 @@ export const USE_VOICE_V2 = true;  // 改成 false 即回滚到 v1
 - **iOS 部分老版本对 SVG apple-touch-icon 兼容差**：已用 PNG 兜底；如未来要求严格统一可手工出 1024×1024 + macOS touch bar 尺寸
 
 **本轮已解决**（历史归档）：
+- ✅ ~~类别删除/新增/重命名 与预算列表不同步~~（双向同步 + 操作顺序修正 + 去掉自动合并）
+- ✅ ~~颜色选择器两个 HEX 值联动~~（拆分为独立的色相 HEX 和明暗 HEX）
+- ✅ ~~年月选择器为网格卡片~~（改为 iOS 风格双列滚轮 + 有交易年月高亮）
 - ✅ ~~储蓄(savings)类型~~（已全面移除，迁移为 income，UI 改为净结余）
 - ✅ ~~图标选择器只有 28 个图标~~（扩充至 66 个，分 10 组）
 - ✅ ~~tennis-ball 图标在 inline LUCIDE 中缺失~~
@@ -326,6 +416,7 @@ src/ui/modals/
 ├─ confirm.js         showAmtPrompt 加 onSuccess 回调；货币显示用 currencySymbol
 ├─ detail.js
 ├─ manual.js          mcTime 状态 + openMcTimeWheel + updateMcTimeBtn（替换前轮 mcPeriod/PERIOD_HOURS）
+├─ month-picker.js    滚轮式年月选择器（InfiniteWheel 双列 + highlightFn 有交易高亮）
 └─ auth.js            onSyncStatus 订阅 → 同步状态实时刷新；signOut 弹 confirm 询问是否清本地
 
 src/utils/
