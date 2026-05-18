@@ -13,11 +13,12 @@ const MODAL_ID = "mpicker";
 // ── InfiniteWheel（与 wheel-time.js 相同实现） ──────────────────────────────
 
 class InfiniteWheel {
-  constructor(container, values, initialVal, { formatFn, finite } = {}) {
+  constructor(container, values, initialVal, { formatFn, finite, highlightFn } = {}) {
     this.container = container;
     this.values = values;
     this.formatFn = formatFn || ((v) => String(v).padStart(2, "0"));
     this.finite = !!finite;
+    this.highlightFn = highlightFn || null; // (value) => boolean
     this.ITEM_HEIGHT = 36;
     this.offset = -(values.indexOf(initialVal) * this.ITEM_HEIGHT);
     if (this.offset > 0) this.offset = 0;
@@ -124,9 +125,17 @@ class InfiniteWheel {
       const diff = logical - centerIndex;
       const y = diff * this.ITEM_HEIGHT;
       const value = this._normalize(Math.round(logical));
-      item.el.innerText = this.formatFn(this.values[value]);
+      const rawVal = this.values[value];
+      item.el.innerText = this.formatFn(rawVal);
       item.el.style.transform = "translateY(" + y + "px)";
-      item.el.style.opacity = Math.max(0.35, 1 - Math.abs(diff) * 0.12);
+      const baseOpacity = Math.max(0.35, 1 - Math.abs(diff) * 0.12);
+      if (this.highlightFn) {
+        const active = this.highlightFn(rawVal);
+        item.el.style.opacity = active ? baseOpacity : baseOpacity * 0.35;
+        item.el.style.fontWeight = active ? "600" : "400";
+      } else {
+        item.el.style.opacity = baseOpacity;
+      }
     }
   }
 
@@ -178,14 +187,32 @@ export function open() {
   yCont.innerHTML = "";
   mCont.innerHTML = "";
 
+  // ── 构建有交易的年月集合 ──────────────────────────────
+  const txs = store.getTxs();
+  const txYearMonthSet = new Set();   // "YYYY-M" 格式（M = 1-12）
+  const txYearSet = new Set();        // 年份集合
+  for (const t of txs) {
+    const d = new Date(t.ts);
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1; // 转为 1-based
+    txYearSet.add(y);
+    txYearMonthSet.add(y + "-" + m);
+  }
+
   const years = getYearRange();
   const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
   _yearInst = new InfiniteWheel(yCont, years, curYear, {
     formatFn: (v) => String(v),
+    highlightFn: (year) => txYearSet.has(year),
   });
   _monthInst = new InfiniteWheel(mCont, months, curMonth + 1, {
     formatFn: (v) => String(v).padStart(2, "0"),
+    // 月份高亮取决于年份滚轮的当前选中值
+    highlightFn: (month) => {
+      const selYear = _yearInst ? _yearInst.getValue() : curYear;
+      return txYearMonthSet.has(selYear + "-" + month);
+    },
   });
 
   const m = byId(MODAL_ID);
