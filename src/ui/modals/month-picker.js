@@ -1,135 +1,231 @@
-// ui/modals/month-picker.js —— 年月选择器（#mpicker）
+// ui/modals/month-picker.js —— 滚轮式年月选择器（#mpicker）
 //
-// 不是标准 .overlay，独立的 .mpicker 弹窗。
-// 两种视图：月份网格（默认）vs 年份网格（点年份标签切换）。
-// 选中月份后：设置 window.viewYear/viewMonth → 调 render + renderAnalysis。
-//
-// 迁移说明：
-//   inline 的 openPicker/toggleYM/pickerNav/renderPicker/selYear/selMonth → 全部桥接到本模块。
-//   HTML 中 onclick="pickerNav(-1)" 等仍走 window 全局。
+// 使用与 wheel-time.js 相同的 InfiniteWheel 组件，
+// 左列 = 年份，右列 = 月份（1-12）。
+// 选中后：设置 window.viewYear/viewMonth → 调 render + renderAnalysis。
 
 import { byId } from "../../utils/dom.js";
-import { fxTap } from "../components/sfx.js";
+import { fxTap, fxOpen, fxClose } from "../components/sfx.js";
 import { store } from "../../state/store.js";
 
 const MODAL_ID = "mpicker";
 
-let _pickerYear = new Date().getFullYear();
-let _showYearGrid = false;   // true = 年份网格; false = 月份网格
+// ── InfiniteWheel（与 wheel-time.js 相同实现） ──────────────────────────────
+
+class InfiniteWheel {
+  constructor(container, values, initialVal, { formatFn, finite } = {}) {
+    this.container = container;
+    this.values = values;
+    this.formatFn = formatFn || ((v) => String(v).padStart(2, "0"));
+    this.finite = !!finite;
+    this.ITEM_HEIGHT = 36;
+    this.offset = -(values.indexOf(initialVal) * this.ITEM_HEIGHT);
+    if (this.offset > 0) this.offset = 0;
+    this.velocity = 0;
+    this.isDragging = false;
+    this.DECAY = 0.94;
+    this.MIN_VELOCITY = 0.02;
+    this.MAX_VELOCITY = 3;
+    this.lastY = 0;
+    this.lastTime = 0;
+    this.poolSize = values.length;
+    this._init();
+    this._bindEvents();
+    this._animId = null;
+    this._loop();
+  }
+
+  _init() {
+    this.inner = document.createElement("div");
+    this.inner.className = "wheel-inner";
+    this.items = [];
+    for (let i = -this.poolSize; i < this.poolSize * 2; i++) {
+      const el = document.createElement("div");
+      el.className = "wheel-item";
+      this.inner.appendChild(el);
+      this.items.push({ el, index: i });
+    }
+    this.container.innerHTML = "";
+    this.container.appendChild(this.inner);
+    const line = document.createElement("div");
+    line.className = "wheel-center-line";
+    this.container.appendChild(line);
+  }
+
+  _normalize(i) {
+    const n = this.values.length;
+    return ((i % n) + n) % n;
+  }
+
+  getValue() {
+    const centerIndex = -this.offset / this.ITEM_HEIGHT;
+    const idx = Math.round(centerIndex);
+    return this.values[this._normalize(idx)];
+  }
+
+  _bindEvents() {
+    const start = (e) => {
+      this.isDragging = true;
+      this.velocity = 0;
+      this.lastY = this._getY(e);
+      this.lastTime = performance.now();
+    };
+    const move = (e) => {
+      if (!this.isDragging) return;
+      const y = this._getY(e);
+      const now = performance.now();
+      const dy = y - this.lastY;
+      const dt = now - this.lastTime;
+      this.offset += dy;
+      this.velocity = Math.max(-this.MAX_VELOCITY, Math.min(this.MAX_VELOCITY, dy / dt));
+      this.lastY = y;
+      this.lastTime = now;
+    };
+    const end = () => { this.isDragging = false; };
+
+    this.container.addEventListener("mousedown", start);
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", end);
+    this.container.addEventListener("touchstart", start, { passive: true });
+    window.addEventListener("touchmove", move, { passive: false });
+    window.addEventListener("touchend", end);
+  }
+
+  _getY(e) {
+    return e.touches ? e.touches[0].clientY : e.clientY;
+  }
+
+  _physics() {
+    if (!this.isDragging) {
+      if (Math.abs(this.velocity) > this.MIN_VELOCITY) {
+        this.offset += this.velocity * 16;
+        this.velocity *= this.DECAY;
+      } else {
+        this.velocity = 0;
+        this._snap();
+      }
+    }
+  }
+
+  _snap() {
+    this.offset = Math.round(this.offset / this.ITEM_HEIGHT) * this.ITEM_HEIGHT;
+  }
+
+  _loopOffset() {
+    const total = this.values.length * this.ITEM_HEIGHT;
+    if (this.offset > total) this.offset -= total;
+    if (this.offset < -total) this.offset += total;
+  }
+
+  _render() {
+    const centerIndex = -this.offset / this.ITEM_HEIGHT;
+    for (const item of this.items) {
+      const logical = item.index + centerIndex;
+      const diff = logical - centerIndex;
+      const y = diff * this.ITEM_HEIGHT;
+      const value = this._normalize(Math.round(logical));
+      item.el.innerText = this.formatFn(this.values[value]);
+      item.el.style.transform = "translateY(" + y + "px)";
+      item.el.style.opacity = Math.max(0.35, 1 - Math.abs(diff) * 0.12);
+    }
+  }
+
+  _loop() {
+    this._physics();
+    this._loopOffset();
+    this._render();
+    this._animId = requestAnimationFrame(() => this._loop());
+  }
+
+  destroy() {
+    if (this._animId) cancelAnimationFrame(this._animId);
+    this._animId = null;
+  }
+}
+
+// ── 单例 ────────────────────────────────────────────────────────────────────
+
+let _yearInst = null;
+let _monthInst = null;
+
+// 年份范围：当前年 ± 10
+function getYearRange() {
+  const now = new Date().getFullYear();
+  const arr = [];
+  for (let y = now - 10; y <= now + 5; y++) arr.push(y);
+  return arr;
+}
 
 // ── 初始化 ──────────────────────────────────────────────────────────────────
 
 export function init() {
-  // 事件已经在 HTML onclick 属性中绑定了 pickerNav / toggleYM / selYear / selMonth，
-  // 通过 window 桥接调到本模块。不需要额外 addEventListener。
+  // 事件通过 HTML onclick 属性 → window 桥接
 }
 
-// ── 打开 / 关闭 ────────────────────────────────────────────────────────────
+// ── 打开 ────────────────────────────────────────────────────────────────────
 
 export function open() {
-  // 读取当前 viewYear（由 inline 或模块维护的全局变量）
-  _pickerYear = typeof window.viewYear === "number" ? window.viewYear : new Date().getFullYear();
-  _showYearGrid = false;
-  render();
+  const curYear = typeof window.viewYear === "number" ? window.viewYear : new Date().getFullYear();
+  const curMonth = typeof window.viewMonth === "number" ? window.viewMonth : new Date().getMonth();
+
+  const yCont = byId("wheelYear");
+  const mCont = byId("wheelMonth");
+  if (!yCont || !mCont) return;
+
+  // 销毁旧实例
+  if (_yearInst) { _yearInst.destroy(); _yearInst = null; }
+  if (_monthInst) { _monthInst.destroy(); _monthInst = null; }
+  yCont.innerHTML = "";
+  mCont.innerHTML = "";
+
+  const years = getYearRange();
+  const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+  _yearInst = new InfiniteWheel(yCont, years, curYear, {
+    formatFn: (v) => String(v),
+  });
+  _monthInst = new InfiniteWheel(mCont, months, curMonth + 1, {
+    formatFn: (v) => String(v).padStart(2, "0"),
+  });
+
   const m = byId(MODAL_ID);
   if (m) m.style.display = "flex";
+  fxOpen();
 }
+
+// ── 关闭（不保存） ─────────────────────────────────────────────────────────
 
 export function close() {
   const m = byId(MODAL_ID);
   if (m) m.style.display = "none";
+  if (_yearInst) { _yearInst.destroy(); _yearInst = null; }
+  if (_monthInst) { _monthInst.destroy(); _monthInst = null; }
+  fxClose();
 }
 
-// ── 渲染 ────────────────────────────────────────────────────────────────────
+// ── 确认选择 ────────────────────────────────────────────────────────────────
 
-export function render() {
-  const yLbl = byId("pyLbl");
-  const pyL  = byId("pyL");
-  const pyR  = byId("pyR");
-  const body = byId("pickerBody");
-  if (!body) return;
+export function confirm() {
+  if (!_yearInst || !_monthInst) return;
+  const y = _yearInst.getValue();
+  const m = _monthInst.getValue(); // 1-12
 
-  // 年份标签：月份模式显示 "2026年 ▾"，年份模式显示 "选择年份 ▴"
-  if (yLbl) yLbl.textContent = _showYearGrid ? "选择年份 ▴" : _pickerYear + "年 ▾";
-  if (pyL)  pyL.textContent  = _showYearGrid ? "‹‹" : "‹";
-  if (pyR)  pyR.textContent  = _showYearGrid ? "››" : "›";
-
-  const viewYear  = typeof window.viewYear  === "number" ? window.viewYear  : new Date().getFullYear();
-  const viewMonth = typeof window.viewMonth === "number" ? window.viewMonth : new Date().getMonth();
-
-  if (_showYearGrid) {
-    // ── 年份网格：当前十年区间 ± 1 年，共 12 格 ──
-    const sy = Math.floor(_pickerYear / 10) * 10 - 1;
-    let h = '<div class="year-grid">';
-    for (let y = sy; y < sy + 12; y++) {
-      h += '<div class="yr-btn' + (y === viewYear ? " active" : "") +
-           '" onclick="selYear(' + y + ')">' + y + '</div>';
-    }
-    h += '</div>';
-    body.innerHTML = h;
-  } else {
-    // ── 月份网格：12 个月，标记 active / has-data ──
-    // 扫描 txs 找哪些月份有数据
-    const txs = store.getTxs();
-    const hd = {};
-    txs.forEach((t) => {
-      const d = new Date(t.ts);
-      hd[d.getFullYear() + "-" + d.getMonth()] = 1;
-    });
-
-    let h2 = '<div class="mpicker-grid">';
-    for (let m = 0; m < 12; m++) {
-      const isActive  = (_pickerYear === viewYear && m === viewMonth);
-      const hasData   = hd[_pickerYear + "-" + m];
-      h2 += '<div class="mpm' +
-             (isActive ? " active" : "") +
-             (hasData && !isActive ? " has-data" : "") +
-             '" onclick="selMonth(' + m + ')">' + (m + 1) + '月</div>';
-    }
-    h2 += '</div>';
-    body.innerHTML = h2;
-  }
-}
-
-// ── 切换年/月视图 ──────────────────────────────────────────────────────────
-
-export function toggleYM() {
-  _showYearGrid = !_showYearGrid;
-  render();
-}
-
-// ── 导航按钮 ────────────────────────────────────────────────────────────────
-
-export function pickerNav(d) {
-  // 年份模式：±10 年；月份模式：±1 年
-  _pickerYear += _showYearGrid ? d * 10 : d;
-  render();
-}
-
-// ── 选择年份（在年份网格中） ────────────────────────────────────────────────
-
-export function selYear(y) {
   fxTap();
-  _pickerYear = y;
-  _showYearGrid = false;
-  render();
-}
+  window.viewYear = y;
+  window.viewMonth = m - 1; // 转为 0-based
 
-// ── 选择月份（最终动作：关闭弹窗 + 切换视图月份） ──────────────────────────
-
-export function selMonth(m) {
-  fxTap();
-  // 更新全局的 viewYear / viewMonth
-  window.viewYear  = _pickerYear;
-  window.viewMonth = m;
-
-  // 关闭弹窗
   close();
 
-  // 刷新主页面
   if (typeof window.render === "function") window.render();
-  // 如果当前在分析页，也刷新分析
   if (window.currentTab === "analysis" && typeof window.renderAnalysis === "function") {
     window.renderAnalysis();
   }
 }
+
+// ── 兼容旧接口（不再需要，但保留避免报错） ──────────────────────────────────
+
+export function render() {}
+export function toggleYM() {}
+export function pickerNav() {}
+export function selYear() {}
+export function selMonth() {}

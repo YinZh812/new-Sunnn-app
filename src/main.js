@@ -325,7 +325,8 @@ window.applyCppLive         = settingsTab.applyCppLive;
 window.saveAndRefreshCpp    = settingsTab.saveAndRefreshCpp;
 window.resetCustomColor     = settingsTab.resetCustomColor;
 window.closeColorPicker     = settingsTab.closeColorPicker;
-window.editHexDirect        = settingsTab.editHexDirect;
+window.editHexHue           = settingsTab.editHexHue;
+window.editHexLit           = settingsTab.editHexLit;
 // 高级主题面板
 window.openThemeAdvanced    = settingsTab.openThemeAdvanced;
 window.closeThemeAdvanced   = settingsTab.closeThemeAdvanced;
@@ -449,16 +450,16 @@ window.doSearchSheet   = searchModal.doSearch;
 // 也桥接到 inline 搜索页用的 doSearch 名称（search tab 会用）
 window.doSearch        = searchModal.doSearch;
 
-// ── 桥接 month-picker modal 及其 onclick 依赖 ─────────────────────────────
-//
-// HTML 中 onclick="openPicker()" / pickerNav(-1) / toggleYM() / selYear(y) / selMonth(m)
-// 全部路由到模块版。renderPicker 也桥接，让控制台可调。
-window.openPicker    = monthPickerModal.open;
-window.renderPicker  = monthPickerModal.render;
-window.toggleYM      = monthPickerModal.toggleYM;
-window.pickerNav     = monthPickerModal.pickerNav;
-window.selYear       = monthPickerModal.selYear;
-window.selMonth      = monthPickerModal.selMonth;
+// ── 桥接 month-picker modal（滚轮式年月选择器）───────────────────────────────
+window.openPicker     = monthPickerModal.open;
+window.closePicker    = monthPickerModal.close;
+window.confirmPicker  = monthPickerModal.confirm;
+// 旧接口保留避免报错
+window.renderPicker   = monthPickerModal.render;
+window.toggleYM       = monthPickerModal.toggleYM;
+window.pickerNav      = monthPickerModal.pickerNav;
+window.selYear        = monthPickerModal.selYear;
+window.selMonth       = monthPickerModal.selMonth;
 
 // ── 桥接 detail modal 及其 onclick 依赖 ─────────────────────────────────────
 window.openDetail          = detailModal.open;

@@ -868,7 +868,7 @@ export function openColorPicker(varName, anchor) {
   const hexEl = document.getElementById("cppHex");
   if (hexEl) hexEl.textContent = cur.toUpperCase();
   const hexHueEl = document.getElementById("cppHexHue");
-  if (hexHueEl) hexHueEl.textContent = cur.toUpperCase();
+  if (hexHueEl) hexHueEl.textContent = hslToHex(_cppCurHue, 80, 50).toUpperCase();
   p.classList.add("open");
   const bd = document.getElementById("colorPickerBackdrop");
   if (bd) bd.classList.add("open");
@@ -919,11 +919,11 @@ export function applyCppLive() {
   const hex = hslToHex(_cppCurHue, 80, _cppCurLit);
   document.body.style.setProperty(_cppCurVar, hex);
   if (_cppCurVar === "--acc") document.body.style.setProperty("--acc-t", contrastText(hex));
-  // 更新两个 hex 显示（颜色滑条下方 + 明暗滑条下方）
+  // 更新两个 hex 显示：cppHex = 最终色（含明暗），cppHexHue = 纯色相色
   const hx = document.getElementById("cppHex");
   if (hx) hx.textContent = hex.toUpperCase();
   const hxHue = document.getElementById("cppHexHue");
-  if (hxHue) hxHue.textContent = hex.toUpperCase();
+  if (hxHue) hxHue.textContent = hslToHex(_cppCurHue, 80, 50).toUpperCase();
   const th = document.getElementById("cppHueThumb");
   if (th) th.style.background = hex;
   document.querySelectorAll('.color-preview-dot[data-var="' + _cppCurVar + '"]').forEach((dot) => { dot.style.background = hex; });
@@ -990,11 +990,11 @@ export function closeColorPicker() {
   _cppCurVar = null;
 }
 
-export function editHexDirect() {
-  const hexEl = document.getElementById("cppHex");
+export function editHexHue() {
+  const hexEl = document.getElementById("cppHexHue");
   if (!hexEl || !_cppCurVar) return;
   const cur = hexEl.textContent.trim();
-  const v = prompt("输入 HEX 颜色值", cur);
+  const v = prompt("输入色相 HEX 颜色值", cur);
   if (!v) return;
   const hex = v.startsWith("#") ? v : "#" + v;
   if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) {
@@ -1003,10 +1003,26 @@ export function editHexDirect() {
   }
   const hsl = hexToHsl(hex);
   _cppCurHue = hsl.h;
-  _cppCurLit = hsl.l;
   applyCppLive();
   saveAndRefreshCpp();
   document.getElementById("cppHueThumb").style.left = (_cppCurHue / 360 * 100) + "%";
+}
+
+export function editHexLit() {
+  const hexEl = document.getElementById("cppHex");
+  if (!hexEl || !_cppCurVar) return;
+  const cur = hexEl.textContent.trim();
+  const v = prompt("输入最终 HEX 颜色值", cur);
+  if (!v) return;
+  const hex = v.startsWith("#") ? v : "#" + v;
+  if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+    if (typeof window.showToast === "function") window.showToast("无效的颜色值");
+    return;
+  }
+  const hsl = hexToHsl(hex);
+  _cppCurLit = hsl.l;
+  applyCppLive();
+  saveAndRefreshCpp();
   document.getElementById("cppLitThumb").style.left = _cppCurLit + "%";
 }
 
