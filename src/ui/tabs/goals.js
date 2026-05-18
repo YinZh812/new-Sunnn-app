@@ -38,11 +38,36 @@ function maybeRefresh() {
 
 export function getBudgetCatList() {
   const s = store.getSettings();
-  if (s.budgetCatOrder && s.budgetCatOrder.length) return s.budgetCatOrder.slice();
   const customByType = store.getCustomCategoriesByType();
   const expCats = (customByType.expense && customByType.expense.length)
     ? customByType.expense : DEFAULT_CATS_BY_TYPE.expense;
   const hasBudget = Object.keys(store.getBudgets());
+
+  if (s.budgetCatOrder && s.budgetCatOrder.length) {
+    const order = s.budgetCatOrder.slice();
+    const existing = new Set(order);
+    let added = false;
+    expCats.forEach((c) => {
+      if (c.name && !existing.has(c.name)) {
+        order.push(c.name);
+        existing.add(c.name);
+        added = true;
+      }
+    });
+    hasBudget.forEach((c) => {
+      if (c && !existing.has(c)) {
+        order.push(c);
+        existing.add(c);
+        added = true;
+      }
+    });
+    if (added) {
+      s.budgetCatOrder = order;
+      store.setSettings(s);
+    }
+    return order;
+  }
+
   const seen = {};
   const out = [];
   expCats.forEach((c) => { if (c.name && !seen[c.name]) { seen[c.name] = 1; out.push(c.name); } });

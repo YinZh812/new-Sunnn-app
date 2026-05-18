@@ -32,6 +32,7 @@ const SHEET_ID   = "sh-confirm";
 const HANDLE_ID  = "hdl-confirm";
 
 let _pending = [];
+let _multiEditIdx = -1;
 let _toast = (msg) => { if (window.showToast) window.showToast(msg); };
 
 const TYPE_LABELS = { expense: "支出", income: "收入", net_income: "支出但获得" };
@@ -52,6 +53,10 @@ function getCatsByType(type) {
 function getCatIcon(name) {
   return getCategoryIcon(name, store.getCustomCategoriesByType(), { size: 22, strokeWidth: 1.6 });
 }
+
+function activeIdx() { return _multiEditIdx >= 0 ? _multiEditIdx : 0; }
+function activeT() { return _pending[activeIdx()]; }
+function rerender() { _multiEditIdx >= 0 ? renderMultiDetail() : renderConfirmSingle(); }
 
 // ── 初始化 ──────────────────────────────────────────────────────────────────
 
@@ -113,6 +118,7 @@ function showConfirm() {
 // ── 多笔渲染 ────────────────────────────────────────────────────────────────
 
 function renderConfirmMulti() {
+  _multiEditIdx = -1;
   const body = byId("sbody");
   if (!body) return;
 
@@ -122,13 +128,13 @@ function renderConfirmMulti() {
     const s = sign(t);
     const sy = sym(t);
     const timeFmt = formatTransactionFull(t);
-    html += '<div class="mcard">' +
+    html += '<div class="mcard mcard-tap" onclick="confMultiEdit(' + i + ')">' +
       '<div class="mcard-top">' +
         '<span class="mcard-idx">第' + (i + 1) + '笔</span>' +
-        '<span class="mcard-amt mcard-edit" style="color:' + amtColor(t) + '" onclick="confMultiEditAmt(' + i + ')">' + s + formatAmount(t.amount) + ' ' + sy + ' ✎</span>' +
+        '<span class="mcard-amt" style="color:' + amtColor(t) + '">' + s + formatAmount(t.amount) + ' ' + sy + '</span>' +
       '</div>' +
       '<div class="mcard-desc" style="display:flex;align-items:center;gap:6px">' +
-        '<span class="mcard-edit" onclick="confMultiEditCat(' + i + ')" title="点击修改类别">' + ico + '</span>' +
+        '<span>' + ico + '</span>' +
         '<span>' + escapeHtml(t.desc) + '</span>' +
       '</div>' +
       '<div class="mcard-meta">' + escapeHtml(t.category) + ' · ' + typeL(t.type) + ' · ' + timeFmt + '</div>' +
@@ -136,28 +142,72 @@ function renderConfirmMulti() {
     '</div>';
   });
   body.innerHTML = html;
+
+  const slbl = byId("slbl");
+  if (slbl) slbl.textContent = "识别到 " + _pending.length + " 笔";
+  const okBtn = byId("okbtn");
+  if (okBtn) { okBtn.textContent = "全部确认记账"; okBtn.onclick = doConfirm; okBtn.style.display = ""; }
 }
 
-export function multiEditAmt(idx) {
-  const t = _pending[idx];
-  if (!t) return;
-  const v = prompt("修改金额", String(t.amount));
-  if (v === null) return;
-  const n = parseFloat(v);
-  if (isNaN(n) || n <= 0) return;
-  t.amount = n;
-  renderConfirmMulti();
+export function multiEdit(idx) {
+  _multiEditIdx = idx;
+  renderMultiDetail();
 }
 
-export function multiEditCat(idx) {
-  const t = _pending[idx];
+function renderMultiDetail() {
+  const t = _pending[_multiEditIdx];
   if (!t) return;
-  const cats = getCatsByType(t.type);
-  const names = cats.map((c) => c.name);
-  const cur = names.indexOf(t.category);
-  const next = (cur + 1) % names.length;
-  t.category = names[next];
-  renderConfirmMulti();
+
+  const slbl = byId("slbl");
+  if (slbl) slbl.textContent = "编辑第 " + (_multiEditIdx + 1) + " 笔";
+
+  const body = byId("sbody");
+  if (!body) return;
+
+  const ico = getCatIcon(t.category);
+  const s = sign(t);
+  const sy = sym(t);
+  const td = formatTransactionFull(t);
+
+  body.innerHTML =
+    '<div class="samt" id="conf-amt-disp" style="cursor:pointer" onclick="confEditAmt()">' +
+      '<span style="color:var(--t1)">' + s + formatAmount(t.amount) + '</span>' +
+      '<span style="font-size:18px;font-weight:400;color:var(--t3);margin-left:5px">' + sy + '</span>' +
+      '<span style="font-size:11px;color:var(--t3);margin-left:6px">✎</span>' +
+    '</div>' +
+    (t.note ? '<div class="snote">' + escapeHtml(t.note) + '</div>' : '') +
+    '<div class="scard">' +
+      '<div class="srow srow-edit" onclick="confEditDesc()">' +
+        '<span class="sk">备注</span>' +
+        '<span class="sv2" id="conf-desc-disp" style="color:var(--t1)">' + escapeHtml(t.desc) + '</span>' +
+      '</div>' +
+      '<div class="srow srow-edit" id="conf-cat-row-hd" onclick="confEditCat()">' +
+        '<span class="sk">类别</span>' +
+        '<span class="sv2" id="conf-cat-disp" style="display:inline-flex;align-items:center;gap:6px;color:var(--t1)">' +
+          '<span style="display:inline-flex;align-items:center">' + ico + '</span>' + escapeHtml(t.category) +
+        '</span>' +
+      '</div>' +
+      '<div id="conf-cat-grid-wrap" style="display:none"><div class="conf-cat-wrap" id="conf-cat-grid"></div></div>' +
+      '<div class="srow srow-edit" onclick="confEditType()">' +
+        '<span class="sk">类型</span>' +
+        '<span class="sv2" id="conf-type-disp">' + typeL(t.type) + '</span>' +
+      '</div>' +
+      '<div class="srow srow-edit" onclick="confEditCur()">' +
+        '<span class="sk">货币</span>' +
+        '<span class="sv2" id="conf-cur-disp">' + escapeHtml(curDisplay(t.currency)) + '</span>' +
+      '</div>' +
+      '<div class="srow">' +
+        '<span class="sk">时间</span>' +
+        '<span class="sv2">' + td + '</span>' +
+      '</div>' +
+    '</div>';
+
+  const okBtn = byId("okbtn");
+  if (okBtn) {
+    okBtn.textContent = "← 返回列表";
+    okBtn.onclick = () => renderConfirmMulti();
+    okBtn.style.display = "";
+  }
 }
 
 // ── 单笔渲染（含就地编辑入口） ──────────────────────────────────────────────
@@ -210,7 +260,7 @@ function renderConfirmSingle() {
 // ── 就地编辑：金额 ──────────────────────────────────────────────────────────
 
 export function editAmount() {
-  const t = _pending[0];
+  const t = activeT();
   if (!t) return;
   const disp = byId("conf-amt-disp");
   if (!disp) return;
@@ -225,19 +275,19 @@ export function editAmount() {
   function save() {
     const v = parseFloat(inp.value);
     if (v > 0) t.amount = parseFloat(v.toFixed(2));
-    renderConfirmSingle();
+    rerender();
   }
   inp.addEventListener("blur", () => setTimeout(save, 120));
   inp.addEventListener("keydown", (e) => {
     if (e.key === "Enter") inp.blur();
-    if (e.key === "Escape") renderConfirmSingle();
+    if (e.key === "Escape") rerender();
   });
 }
 
 // ── 就地编辑：描述 ──────────────────────────────────────────────────────────
 
 export function editDesc() {
-  const t = _pending[0];
+  const t = activeT();
   if (!t) return;
   const disp = byId("conf-desc-disp");
   if (!disp) return;
@@ -251,12 +301,12 @@ export function editDesc() {
   function save() {
     const v = inp.value.trim();
     if (v) t.desc = v;
-    renderConfirmSingle();
+    rerender();
   }
   inp.addEventListener("blur", () => setTimeout(save, 120));
   inp.addEventListener("keydown", (e) => {
     if (e.key === "Enter") inp.blur();
-    if (e.key === "Escape") renderConfirmSingle();
+    if (e.key === "Escape") rerender();
   });
 }
 
@@ -267,7 +317,7 @@ export function editCategory() {
   if (!wrap) return;
   if (wrap.style.display !== "none") { wrap.style.display = "none"; return; }
 
-  const t = _pending[0];
+  const t = activeT();
   if (!t) return;
   const grid = byId("conf-cat-grid");
   if (!grid) return;
@@ -278,7 +328,7 @@ export function editCategory() {
     const btn = document.createElement("div");
     btn.className = "conf-cat-btn" + (c.name === t.category ? " sel" : "");
     btn.innerHTML = '<div style="font-size:16px">' + renderIcon(c.icon, 18, 1.6) + '</div><div>' + escapeHtml(c.name) + '</div>';
-    btn.onclick = () => { t.category = c.name; renderConfirmSingle(); };
+    btn.onclick = () => { t.category = c.name; rerender(); };
     grid.appendChild(btn);
   });
   wrap.style.display = "block";
@@ -287,7 +337,7 @@ export function editCategory() {
 // ── 就地编辑：类型（循环切换） ──────────────────────────────────────────────
 
 export function editType() {
-  const t = _pending[0];
+  const t = activeT();
   if (!t) return;
   const order = ["expense", "income"];
   t.type = order[(order.indexOf(t.type) + 1) % order.length];
@@ -298,7 +348,7 @@ export function editType() {
     t.category = typed[0].name;
   }
 
-  renderConfirmSingle();
+  rerender();
 
   const wrap = byId("conf-cat-grid-wrap");
   if (wrap && wrap.style.display !== "none" && wrap.style.display !== "") {
@@ -309,7 +359,7 @@ export function editType() {
         const btn = document.createElement("div");
         btn.className = "conf-cat-btn" + (c.name === t.category ? " sel" : "");
         btn.innerHTML = '<div style="font-size:16px">' + renderIcon(c.icon, 18, 1.6) + '</div><div>' + escapeHtml(c.name) + '</div>';
-        btn.onclick = () => { t.category = c.name; renderConfirmSingle(); };
+        btn.onclick = () => { t.category = c.name; rerender(); };
         grid.appendChild(btn);
       });
       wrap.style.display = "block";
@@ -320,7 +370,7 @@ export function editType() {
 // ── 就地编辑：货币（切换 EUR/CNY） ──────────────────────────────────────────
 
 export function editCurrency() {
-  const t = _pending[0];
+  const t = activeT();
   if (!t) return;
   // 在 settings.enabledCurrencies 之间循环（与 Hero / 手动 / 详情页一致）
   const settings = store.getSettings();

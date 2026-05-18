@@ -378,8 +378,9 @@ body{font-family:var(--font-app);color:var(--t1);-webkit-font-smoothing:antialia
 .color-picker-panel .hue-slider{margin-bottom:8px}
 .color-picker-panel .lit-slider{position:relative;height:20px;border-radius:10px;cursor:pointer;touch-action:none;margin-bottom:8px}
 .color-picker-panel .lit-thumb{position:absolute;top:50%;width:20px;height:20px;border-radius:50%;background:#FFF;border:2px solid var(--t1);transform:translate(-50%,-50%);pointer-events:none}
-.color-picker-panel .cpp-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px}
-.color-picker-panel .cpp-hex{font-size:10px;color:var(--t3);font-family:var(--font-digit)}
+.color-picker-panel .cpp-hex-row{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding:0 2px}
+.color-picker-panel .cpp-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px}
+.color-picker-panel .cpp-hex{font-size:12px;color:var(--t1);font-family:var(--font-digit);cursor:pointer;padding:4px 10px;border-radius:6px;background:var(--bdr2)}
 .color-picker-panel .cpp-reset{font-size:11px;color:var(--acc);cursor:pointer;padding:6px 10px;border-radius:8px;background:var(--bdr2)}
 .color-picker-panel .cpp-reset:active{opacity:.6}
 .color-picker-panel .cpp-close{font-size:11px;color:var(--t2);cursor:pointer;padding:6px 10px;border-radius:8px}
@@ -472,7 +473,8 @@ body{font-family:var(--font-app);color:var(--t1);-webkit-font-smoothing:antialia
 .mcard-desc{font-size:13px;font-weight:400;color:var(--t1);margin-bottom:2px}
 .mcard-meta{font-size:10px;color:var(--t2);letter-spacing:0.2px}
 .mcard-note{font-size:10px;color:var(--t3);margin-top:4px;background:var(--card);padding:3px 8px;border-radius:6px;display:inline-block}
-.mcard-edit{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.mcard-tap{cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .1s}
+.mcard-tap:active{transform:scale(0.98)}
 
 .form-row{margin-bottom:12px}
 .form-label{font-size:10px;font-weight:500;color:var(--t2);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px}

@@ -35,9 +35,9 @@ const THEMES = [
   { id: "ocean",  label: "雾蓝", h: "#2C7DA0", bg: "#A9D6E5" },
   { id: "pink",   label: "轻梦", h: "#B080CC", bg: "#FFCBF2" },
   { id: "meadow", label: "草甸", h: "#D4A373", bg: "#FAEDCD" },
-  { id: "gray",   label: "秩序", h: "#1A1A1A", bg: "#E8E8E8" },
-  { id: "white",  label: "极简", h: "#000000", bg: "#F8F9FA" },
-  { id: "dark",   label: "极夜", h: "#FFFFFF", bg: "#000000" },
+  { id: "gray",   label: "秩序", h: "#808080", bg: "#D0D0D0" },
+  { id: "white",  label: "极简", h: "#FFFFFF", bg: "#DEE2E6" },
+  { id: "dark",   label: "极夜", h: "#000000", bg: "#4A4A4A" },
 ];
 
 const ACCENT_COLORS = [
@@ -259,7 +259,7 @@ export function render() {
       '<div style="display:flex;gap:8px;margin-top:8px">' +
         '<div class="action-btn" style="flex:1;background:var(--bdr2);color:var(--t1)" onclick="cleanupTxs(\'month\')">删本月</div>' +
         '<div class="action-btn" style="flex:1;background:var(--bdr2);color:var(--t1)" onclick="cleanupTxs(\'year\')">删本年</div>' +
-        '<div class="action-btn" style="flex:1;background:var(--expense);color:#fff" onclick="cleanupTxs(\'all\')">删全部</div>' +
+        '<div class="action-btn" style="flex:1;background:var(--expense);color:var(--bg)" onclick="cleanupTxs(\'all\')">删全部</div>' +
       '</div>' +
     '</div>' +
 
@@ -300,8 +300,8 @@ export function render() {
     renderLearnedRulesCard() +
 
     // ── 重置应用 ──
-    '<div class="set-card" style="margin-top:24px;border:1px solid var(--expense);background:transparent">' +
-      '<div class="action-btn" style="background:var(--expense);color:#fff" onclick="resetApp()">重置应用（清除全部数据）</div>' +
+    '<div class="set-card" style="margin-top:24px">' +
+      '<div class="action-btn" style="background:var(--bdr2);color:var(--expense);font-weight:400" onclick="resetApp()">重置应用（清除全部数据）</div>' +
     '</div>';
 
   // 绑定隐藏的色相滑块
