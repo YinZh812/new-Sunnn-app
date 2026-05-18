@@ -47,13 +47,8 @@ export function getBudgetCatList() {
     const order = s.budgetCatOrder.slice();
     const existing = new Set(order);
     let added = false;
-    expCats.forEach((c) => {
-      if (c.name && !existing.has(c.name)) {
-        order.push(c.name);
-        existing.add(c.name);
-        added = true;
-      }
-    });
+    // 仅自动合并已设预算但不在列表中的类别（防止数据丢失）
+    // 不再自动合并 expCats —— 类别增删改通过双向同步显式管理
     hasBudget.forEach((c) => {
       if (c && !existing.has(c)) {
         order.push(c);
@@ -235,11 +230,26 @@ export function renderBudgetCatEditor() {
     del.onclick = function (e) {
       e.stopPropagation();
       if (!confirm("删除「" + c + "」预算？")) return;
+      // 先从支出类别中移除（必须在 setSettings 之前，
+      // 否则 settings:changed → getBudgetCatList 会从 expense 重新合并）
+      const cbt = store.getCustomCategoriesByType();
+      if (cbt.expense && cbt.expense.length) {
+        const ci = cbt.expense.findIndex(function(cat) { return cat.name === c; });
+        if (ci >= 0) {
+          cbt.expense.splice(ci, 1);
+          store.setCustomCategoriesByType(cbt);
+          if (window.customCategoriesByType) window.customCategoriesByType = cbt;
+          if (window.customCategories && cbt.expense) window.customCategories = cbt.expense;
+        }
+      }
+      // 删除预算金额
       const budgets = { ...store.getBudgets() };
       delete budgets[c];
       store.setBudgets(budgets);
+      // 从预算类别顺序中移除
       const ss = store.getSettings();
-      ss.budgetCatOrder.splice(i, 1);
+      const oi = ss.budgetCatOrder ? ss.budgetCatOrder.indexOf(c) : -1;
+      if (oi >= 0) ss.budgetCatOrder.splice(oi, 1);
       store.setSettings(ss);
       renderBudgetCatEditor();
       fxDelete();
@@ -307,6 +317,18 @@ export function addBudgetCatNew() {
   }
   s.budgetCatOrder.push(name);
   store.setSettings(s);
+  // 双向同步：同时添加到支出类别
+  const cbt = store.getCustomCategoriesByType();
+  const expCats = cbt.expense || [];
+  const alreadyExists = expCats.some(function(cat) { return cat.name === name; });
+  if (!alreadyExists) {
+    expCats.push({ name: name, icon: "lucide:package" });
+    cbt.expense = expCats;
+    store.setCustomCategoriesByType(cbt);
+    // 同步 inline 全局变量
+    if (window.customCategoriesByType) window.customCategoriesByType = cbt;
+    if (window.customCategories) window.customCategories = cbt.expense;
+  }
   renderBudgetCatEditor();
   fxTap();
 }

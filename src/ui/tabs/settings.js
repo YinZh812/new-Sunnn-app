@@ -300,8 +300,8 @@ export function render() {
     renderLearnedRulesCard() +
 
     // ── 重置应用 ──
-    '<div class="set-card" style="margin-top:24px">' +
-      '<div class="action-btn" style="background:var(--bdr2);color:var(--expense);font-weight:400" onclick="resetApp()">重置应用（清除全部数据）</div>' +
+    '<div style="margin-top:24px;padding:0 16px">' +
+      '<div class="action-btn" style="background:var(--bdr2);color:var(--expense);font-weight:400;border:none" onclick="resetApp()">重置应用（清除全部数据）</div>' +
     '</div>';
 
   // 绑定隐藏的色相滑块
@@ -866,12 +866,9 @@ export function openColorPicker(varName, anchor) {
   document.getElementById("cppHueThumb").style.background = cur;
   document.getElementById("cppLitThumb").style.left = _cppCurLit + "%";
   const hexEl = document.getElementById("cppHex");
-  hexEl.textContent = cur.toUpperCase();
-  if (!hexEl._clickBound) {
-    hexEl._clickBound = true;
-    hexEl.style.cursor = "pointer";
-    hexEl.addEventListener("click", editHexDirect);
-  }
+  if (hexEl) hexEl.textContent = cur.toUpperCase();
+  const hexHueEl = document.getElementById("cppHexHue");
+  if (hexHueEl) hexHueEl.textContent = cur.toUpperCase();
   p.classList.add("open");
   const bd = document.getElementById("colorPickerBackdrop");
   if (bd) bd.classList.add("open");
@@ -922,8 +919,11 @@ export function applyCppLive() {
   const hex = hslToHex(_cppCurHue, 80, _cppCurLit);
   document.body.style.setProperty(_cppCurVar, hex);
   if (_cppCurVar === "--acc") document.body.style.setProperty("--acc-t", contrastText(hex));
+  // 更新两个 hex 显示（颜色滑条下方 + 明暗滑条下方）
   const hx = document.getElementById("cppHex");
   if (hx) hx.textContent = hex.toUpperCase();
+  const hxHue = document.getElementById("cppHexHue");
+  if (hxHue) hxHue.textContent = hex.toUpperCase();
   const th = document.getElementById("cppHueThumb");
   if (th) th.style.background = hex;
   document.querySelectorAll('.color-preview-dot[data-var="' + _cppCurVar + '"]').forEach((dot) => { dot.style.background = hex; });
@@ -990,7 +990,7 @@ export function closeColorPicker() {
   _cppCurVar = null;
 }
 
-function editHexDirect() {
+export function editHexDirect() {
   const hexEl = document.getElementById("cppHex");
   if (!hexEl || !_cppCurVar) return;
   const cur = hexEl.textContent.trim();
@@ -1101,10 +1101,36 @@ export function renderCatSettings() {
     nm.className = "cs-name";
     nm.value = c.name;
     nm.placeholder = "类别名";
-    nm.oninput = function () { cats[i].name = nm.value; };
+    nm.oninput = function () {
+      nm._oldName = nm._oldName || cats[i].name;
+      cats[i].name = nm.value;
+    };
     nm.onblur = function () {
+      const oldName = nm._oldName || "";
       if (!nm.value.trim()) nm.value = cats[i].name = "新类别";
+      const newName = cats[i].name;
+      // 双向同步：先更新预算类别顺序（必须在 saveCustomCategories 之前，
+      // 否则 cats:changed → getBudgetCatList 会把新名称当新类别加入）
+      if (oldName && oldName !== newName) {
+        const s = store.getSettings();
+        if (s.budgetCatOrder && s.budgetCatOrder.length) {
+          const idx = s.budgetCatOrder.indexOf(oldName);
+          if (idx >= 0) {
+            s.budgetCatOrder[idx] = newName;
+            store.setSettings(s);
+          }
+        }
+        // 同时更新预算金额的键名
+        const budgets = store.getBudgets();
+        if (budgets[oldName] !== undefined) {
+          const nb = { ...budgets };
+          nb[newName] = nb[oldName];
+          delete nb[oldName];
+          store.setBudgets(nb);
+        }
+      }
       if (typeof window.saveCustomCategories === "function") window.saveCustomCategories();
+      nm._oldName = null;
     };
     const del = document.createElement("span");
     del.className = "cs-del";
@@ -1241,15 +1267,41 @@ export function deleteCat(i) {
     if (typeof window.showToast === "function") window.showToast("至少保留 1 个类别");
     return;
   }
-  if (!confirm("删除类别 \"" + cats[i].name + "\"？已记录的交易不受影响。")) return;
+  const catName = cats[i].name;
+  if (!confirm("删除类别 \"" + catName + "\"？已记录的交易不受影响。")) return;
   cats.splice(i, 1);
   if (typeof window.saveCustomCategories === "function") window.saveCustomCategories();
+  // 双向同步：同时从预算类别顺序中移除
+  const s = store.getSettings();
+  if (s.budgetCatOrder && s.budgetCatOrder.length) {
+    const idx = s.budgetCatOrder.indexOf(catName);
+    if (idx >= 0) {
+      s.budgetCatOrder.splice(idx, 1);
+      store.setSettings(s);
+    }
+  }
+  // 同时删除该类别的预算金额
+  const budgets = store.getBudgets();
+  if (budgets[catName] !== undefined) {
+    const nb = { ...budgets };
+    delete nb[catName];
+    store.setBudgets(nb);
+  }
   renderCatSettings();
 }
 
 export function addNewCat() {
-  window.customCategories.push({ name: "新类别", icon: "lucide:package" });
+  const newName = "新类别";
+  window.customCategories.push({ name: newName, icon: "lucide:package" });
   if (typeof window.saveCustomCategories === "function") window.saveCustomCategories();
+  // 双向同步：同时添加到预算类别顺序
+  const s = store.getSettings();
+  if (s.budgetCatOrder && s.budgetCatOrder.length) {
+    if (s.budgetCatOrder.indexOf(newName) < 0) {
+      s.budgetCatOrder.push(newName);
+      store.setSettings(s);
+    }
+  }
   renderCatSettings();
   const list = document.getElementById("catSettingsList");
   setTimeout(function () { list.scrollTop = list.scrollHeight; }, 30);

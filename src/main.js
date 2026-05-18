@@ -325,6 +325,7 @@ window.applyCppLive         = settingsTab.applyCppLive;
 window.saveAndRefreshCpp    = settingsTab.saveAndRefreshCpp;
 window.resetCustomColor     = settingsTab.resetCustomColor;
 window.closeColorPicker     = settingsTab.closeColorPicker;
+window.editHexDirect        = settingsTab.editHexDirect;
 // 高级主题面板
 window.openThemeAdvanced    = settingsTab.openThemeAdvanced;
 window.closeThemeAdvanced   = settingsTab.closeThemeAdvanced;
